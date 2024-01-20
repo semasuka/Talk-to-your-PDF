@@ -127,6 +127,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.talk_to_pdf
 
 # Spyder project settings
 .spyderproject
