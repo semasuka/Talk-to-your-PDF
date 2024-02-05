@@ -1,7 +1,4 @@
-#!/usr/bin/env python
-# coding: utf-8
 
-# In[1]:
 
 
 import openai, glob, os
@@ -10,8 +7,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from pdfminer.high_level import extract_text as pdf_extract_text
 
-
-# In[2]:
 
 
 class PreRunProcessor:
