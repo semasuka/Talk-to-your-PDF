@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[7]:
 
 
 import import_ipynb
@@ -11,7 +11,7 @@ from information_retrieval_service import process_retrieval
 from response_service import process_response
 
 
-# In[5]:
+# In[8]:
 
 
 def main():
@@ -43,7 +43,7 @@ def main():
         print("Pre-run service failed. Please check the setup and try again.")
 
 
-# In[6]:
+# In[9]:
 
 
 # Ensure this script runs as the main program

@@ -29,8 +29,7 @@ class IntentService:
                 input=question,
             )
             is_flagged = response.results[0].flagged
-            print("1st check:")
-            return is_flagged, "This question has been flagged for malicious content, therefore I cannot proceed!\nPlease try a different question..." if is_flagged else "No malicious intent detected. I can proceed with checking if it is related to your PDF"
+            return is_flagged, "This question has been flagged for malicious content and cannot be processed." if is_flagged else "No malicious intent detected."
         except Exception as e:
             return None, f"Error in moderation: {str(e).split('. ')[0]}."
         
@@ -74,11 +73,9 @@ class IntentService:
                     closest_id, _, distance = result
                     threshold = 0.5  # albritrary threshold that works well with my PDF, needs to test it out accordingly 
                     if distance < threshold:
-                        print("2nd check:")
-                        return True, "Question is related to the PDF content. I can proceed now with an answer to your question..."
+                        return True, "Question is related to the PDF content."
                     else:
-                        print("2nd check:")
-                        return False, "Question is not related to the PDF content. I am only limited to answer question related to the PDF content..."
+                        return False, "Question is not related to the PDF content."
                 else:
                     return False, "No match found in the database."
         except Exception as e:
@@ -94,7 +91,7 @@ def intent_orchestrator(service):
 
     while True:
         clear_output(wait=True)
-        question = input("Enter your question to ask your PDF or type 'exit' to quit the program: ").strip()
+        question = input("Enter your question or type 'exit' to quit: ").strip()
         if question.lower() == 'exit':
             print("Exiting...")
             return None
