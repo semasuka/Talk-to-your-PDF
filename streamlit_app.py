@@ -95,7 +95,7 @@ class IntentService:
             )
             is_flagged = response.results[0].flagged
             if is_flagged:
-                return is_flagged, "This question has been flagged for malicious content. Please try a different question..."
+                return is_flagged, "This question has been flagged for malicious or inappropriate content."
             else:
                 return is_flagged, "No malicious intent detected."
         except Exception as e:
@@ -143,50 +143,44 @@ class IntentService:
                     if distance < threshold:
                         return True, "Question is related to the PDF content."
                     else:
-                        return False, "Question is not related to the PDF content. Please try a different question..."
+                        return False, "Question is not related to the PDF content."
                 else:
                     return False, "No match found in the database."
         except Exception as e:
             print(f"Error searching the database: {e}")
             return False, f"Error searching the database: {e}"
 
-def intent_orchestrator(service_class):
+
+
+def intent_orchestrator(service_class, user_question):
     """Orchestrates the process of checking if a question is related to any PDF content."""
-    if 'submitted' not in st.session_state:
-        st.session_state.submitted = False
+    is_flagged, flag_message = service_class.detect_malicious_intent(user_question)
+    st.write(flag_message)
 
-    user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
-    
-    if st.button('Ask', key="ask_button"):
-        st.session_state.submitted = True
+    if is_flagged:
+        st.error("Your question was not processed. Please try a different question...")
+        return None
 
-    if st.session_state.submitted:
-        st.session_state.submitted = False  # Reset the flag to handle re-runs
-        is_flagged, flag_message = service_class.detect_malicious_intent(user_question)
-        st.write(flag_message)
+    related, relatedness_message = service_class.check_relatedness_to_pdf_content(user_question)
 
-        if is_flagged:
-            return None
+    if related:
+        vectorized_question = service_class.question_to_embeddings(user_question)
+        st.write(relatedness_message)
+        st.success("Your question was processed successfully. Now fetching an answer...")
+        return vectorized_question, user_question
+    else:
+        st.write(relatedness_message)
+        st.error("Your question was not processed. Please try a different question...")
+        return None
 
-        related, rel_message = service_class.check_relatedness_to_pdf_content(user_question)
-        st.write(rel_message)
-
-        if related:
-            vectorized_question = service_class.question_to_embeddings(user_question)
-            return vectorized_question, user_question
-        else:
-            return None
-
-def process_user_question(service_class):
+def process_user_question(service_class, user_question):
     """Main function to start the question processing workflow."""
-    result = intent_orchestrator(service_class)
+    result = intent_orchestrator(service_class, user_question)
 
     if result:
-        # Process the question and handle the result
         vectorized_question, question = result
         # Implement what should happen once the question is processed
         # ...
-        
         
         
 def main():
@@ -194,12 +188,18 @@ def main():
 
     uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
     if uploaded_file is not None:
-        # run the animation while process_pre_run is running
         with st_lottie_spinner(lottie_animation, quality='high', height='100px', width='100px'):
             process_pre_run(uploaded_file)
 
         service_class = IntentService()  # Create an instance of the service class
-        process_user_question(service_class)  # Call this function once after PDF upload
+
+        # Create a form for question input and submission
+        with st.form(key='question_form'):
+            user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
+            submit_button = st.form_submit_button(label='Ask')
+
+        if submit_button:
+            process_user_question(service_class, user_question)
 
 # Run the app
 if __name__ == '__main__':
