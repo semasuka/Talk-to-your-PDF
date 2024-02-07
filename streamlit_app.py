@@ -94,7 +94,10 @@ class IntentService:
                 input=question,
             )
             is_flagged = response.results[0].flagged
-            return is_flagged, "This question has been flagged for malicious content and cannot be processed." if is_flagged else "No malicious intent detected."
+            if is_flagged:
+                return is_flagged, "This question has been flagged for malicious content therefore cannot be processed.\nPlease try a different question..."
+            else:
+                return is_flagged, "No malicious intent detected. We can proceed"
         except Exception as e:
             return None, f"Error in moderation: {str(e).split('. ')[0]}."
         
