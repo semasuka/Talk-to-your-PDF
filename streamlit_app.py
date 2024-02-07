@@ -1,9 +1,6 @@
 import streamlit as st
 import numpy as np
 import openai, os, requests, dropbox
-from dropbox.exceptions import ApiError
-from dropbox.files import WriteMode
-from dropbox.sharing import CreateSharedLinkWithSettingsError
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -100,9 +97,9 @@ class IntentService:
             )
             is_flagged = response.results[0].flagged
             if is_flagged:
-                return is_flagged, "This question has been flagged for malicious or inappropriate content."
+                return is_flagged, "This question has been flagged for malicious or inappropriate content..."
             else:
-                return is_flagged, "No malicious intent detected."
+                return is_flagged, "No malicious intent detected..."
         except Exception as e:
             return None, f"Error in moderation: {str(e).split('. ')[0]}."
         
@@ -146,9 +143,9 @@ class IntentService:
                     closest_id, _, distance = result
                     threshold = 0.5  # albritrary threshold that works well with my PDF, needs to test it out accordingly 
                     if distance < threshold:
-                        return True, "Question is related to the PDF content."
+                        return True, "Question is related to the PDF content..."
                     else:
-                        return False, "Question is not related to the PDF content."
+                        return False, "Question is not related to the PDF content..."
                 else:
                     return False, "No match found in the database."
         except Exception as e:
@@ -186,7 +183,7 @@ def intent_orchestrator(service_class, user_question):
     st.write(flag_message)
 
     if is_flagged:
-        st.error("Your question was not processed. Please try a different question...")
+        st.error("Your question was not processed. Please try a different question.")
         return None
 
     related, relatedness_message = service_class.check_relatedness_to_pdf_content(user_question)
@@ -194,11 +191,11 @@ def intent_orchestrator(service_class, user_question):
     if related:
         vectorized_question = service_class.question_to_embeddings(user_question)
         st.write(relatedness_message)
-        st.success("Your question was processed successfully. Now fetching an answer...")
+        st.success("Your question was processed successfully. Now fetching an answer.")
         return vectorized_question, user_question
     else:
         st.write(relatedness_message)
-        st.error("Your question was not processed. Please try a different question...")
+        st.error("Your question was not processed. Please try a different question.")
         return None
 
 def process_user_question(service_class, user_question):
