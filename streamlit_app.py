@@ -150,43 +150,45 @@ class IntentService:
             print(f"Error searching the database: {e}")
             return False, f"Error searching the database: {e}"
 
-
-
 def intent_orchestrator(service_class):
     """Orchestrates the process of checking if a question is related to any PDF content."""
+    if 'submitted' not in st.session_state:
+        st.session_state.submitted = False
+
     user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
-    ask_button = st.button('Ask', key="ask_button")
+    
+    if st.button('Ask', key="ask_button"):
+        st.session_state.submitted = True
 
-    # Trigger question processing immediately on button press
-    if ask_button:
-        is_flagged, message = service_class.detect_malicious_intent(user_question)
-        st.write(message)
+    if st.session_state.submitted:
+        st.session_state.submitted = False  # Reset the flag to handle re-runs
+        is_flagged, flag_message = service_class.detect_malicious_intent(user_question)
+        st.write(flag_message)
 
-        if is_flagged or is_flagged is None:
-            return None  # End the function early if question is flagged or an error occurred
-        
-        related, message = service_class.check_relatedness_to_pdf_content(user_question)
-        st.write(message)
+        if is_flagged:
+            return None
+
+        related, rel_message = service_class.check_relatedness_to_pdf_content(user_question)
+        st.write(rel_message)
 
         if related:
             vectorized_question = service_class.question_to_embeddings(user_question)
             return vectorized_question, user_question
         else:
-            return None  # Return None to indicate question is unrelated or no match found
-
-
-
+            return None
 
 def process_user_question(service_class):
     """Main function to start the question processing workflow."""
-    result = intent_orchestrator(service_class)  # Store the return value in a variable
+    result = intent_orchestrator(service_class)
 
     if result:
-        vectorized_question, question = result  # Unpack the result only if it's not None
-        st.success("Your question was processed successfully...")
-        # rest of the logic if question is related or not flagged
-
-
+        # Process the question and handle the result
+        vectorized_question, question = result
+        # Implement what should happen once the question is processed
+        # ...
+        
+        
+        
 def main():
     st.title("Talk to Your PDF")
 
