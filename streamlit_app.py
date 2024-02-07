@@ -151,13 +151,19 @@ class IntentService:
 
 def intent_orchestrator(service_class):
     """Orchestrates the process of checking if a question is related to any PDF content."""
-    user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
-    ask_button = st.button('Ask', key="ask_button")
+    if 'ask_pressed' not in st.session_state:
+        st.session_state['ask_pressed'] = False
 
-    if ask_button:  # Ensure processing only occurs when the button is pressed
+    user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
+    
+    if st.button('Ask', key="ask_button"):
+        st.session_state['ask_pressed'] = True  # Set the flag when the button is pressed
+    
+    if st.session_state['ask_pressed']:  # Check if the button has been pressed
+        st.session_state['ask_pressed'] = False  # Reset the flag for the next question
         is_flagged, message = service_class.detect_malicious_intent(user_question)
         st.write(message)
-        if is_flagged or is_flagged is None:  # Skip further processing if flagged or an error occurred
+        if is_flagged or is_flagged is None:
             return None
 
         related, message = service_class.check_relatedness_to_pdf_content(user_question)
@@ -168,6 +174,7 @@ def intent_orchestrator(service_class):
         else:
             st.write("Please try a different question...")
             return None
+
 
 
 def process_user_question(service_class):
