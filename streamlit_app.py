@@ -95,9 +95,9 @@ class IntentService:
             )
             is_flagged = response.results[0].flagged
             if is_flagged:
-                return is_flagged, "This question has been flagged for malicious content therefore cannot be processed.\nPlease try a different question..."
+                return is_flagged, "This question has been flagged for malicious content. Please try a different question..."
             else:
-                return is_flagged, "No malicious intent detected. We can proceed"
+                return is_flagged, "No malicious intent detected."
         except Exception as e:
             return None, f"Error in moderation: {str(e).split('. ')[0]}."
         
@@ -143,7 +143,7 @@ class IntentService:
                     if distance < threshold:
                         return True, "Question is related to the PDF content."
                     else:
-                        return False, "Question is not related to the PDF content."
+                        return False, "Question is not related to the PDF content. Please try a different question..."
                 else:
                     return False, "No match found in the database."
         except Exception as e:
@@ -154,29 +154,26 @@ class IntentService:
 
 def intent_orchestrator(service_class):
     """Orchestrates the process of checking if a question is related to any PDF content."""
-    if 'ask_pressed' not in st.session_state:
-        st.session_state['ask_pressed'] = False
-
     user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
-    
-    if st.button('Ask', key="ask_button"):
-        st.session_state['ask_pressed'] = True  # Set the flag when the button is pressed
-    
-    if st.session_state['ask_pressed']:  # Check if the button has been pressed
-        st.session_state['ask_pressed'] = False  # Reset the flag for the next question
+    ask_button = st.button('Ask', key="ask_button")
+
+    # Trigger question processing immediately on button press
+    if ask_button:
         is_flagged, message = service_class.detect_malicious_intent(user_question)
         st.write(message)
-        if is_flagged or is_flagged is None:
-            return None
 
+        if is_flagged or is_flagged is None:
+            return None  # End the function early if question is flagged or an error occurred
+        
         related, message = service_class.check_relatedness_to_pdf_content(user_question)
         st.write(message)
+
         if related:
             vectorized_question = service_class.question_to_embeddings(user_question)
             return vectorized_question, user_question
         else:
-            st.write("Please try a different question...")
-            return None
+            return None  # Return None to indicate question is unrelated or no match found
+
 
 
 
@@ -188,9 +185,6 @@ def process_user_question(service_class):
         vectorized_question, question = result  # Unpack the result only if it's not None
         st.success("Your question was processed successfully...")
         # rest of the logic if question is related or not flagged
-    else:
-        # If result is None, it means we should ask another question
-        pass  
 
 
 def main():
