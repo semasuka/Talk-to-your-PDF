@@ -1,6 +1,9 @@
 import streamlit as st
 import numpy as np
-import openai, os, requests
+import openai, os, requests, dropbox
+from dropbox.exceptions import ApiError
+from dropbox.files import WriteMode
+from dropbox.sharing import CreateSharedLinkWithSettingsError
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -19,7 +22,9 @@ def load_lottieurl(url):
     return r.json()
 
 
-lottie_animation = load_lottieurl('https://lottie.host/5ac92c74-1a02-40ff-ac96-947c14236db1/u4nCMW6fXU.json')
+loading_animation = load_lottieurl('https://lottie.host/5ac92c74-1a02-40ff-ac96-947c14236db1/u4nCMW6fXU.json')
+
+
 
 
 ##### Pre-run services #####
@@ -150,7 +155,30 @@ class IntentService:
             print(f"Error searching the database: {e}")
             return False, f"Error searching the database: {e}"
 
+def upload_to_dropbox(file_stream, file_name):
+    # Load environment variables
+    load_dotenv()
 
+    # Retrieve the access token from the environment variable
+    DROPBOX_ACCESS_TOKEN = os.getenv("DROPBOX_TOKEN")
+
+    if not DROPBOX_ACCESS_TOKEN:
+        raise ValueError("Missing access token. Please set the DROPBOX_ACCESS_TOKEN environment variable.")
+
+    dbx = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
+
+    # Try to upload the file and create a shared link
+    try:
+        dbx.files_upload(file_stream.read(), '/' + file_name, mode=dropbox.files.WriteMode('overwrite'))
+        shared_link_metadata = dbx.sharing_create_shared_link_with_settings('/' + file_name)
+        return shared_link_metadata.url
+    except dropbox.exceptions.ApiError as err:
+        if isinstance(err.error, dropbox.sharing.CreateSharedLinkWithSettingsError) and err.error.is_shared_link_already_exists():
+            # Shared link already exists, get the existing shared link
+            link_metadata = dbx.sharing_list_shared_links(path='/' + file_name).links
+            return link_metadata[0].url if link_metadata else None
+        else:
+            raise
 
 def intent_orchestrator(service_class, user_question):
     """Orchestrates the process of checking if a question is related to any PDF content."""
@@ -188,8 +216,16 @@ def main():
 
     uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
     if uploaded_file is not None:
-        with st_lottie_spinner(lottie_animation, quality='high', height='100px', width='100px'):
+        
+
+        # animation while uploading the PDF and processing the question
+        with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
             process_pre_run(uploaded_file)
+        
+        share_link = upload_to_dropbox(uploaded_file, uploaded_file.name)
+        # Use markdown to display the hyperlink
+        st.markdown(f'PDF file can be found [here]({share_link}).', unsafe_allow_html=True)
+            
 
         service_class = IntentService()  # Create an instance of the service class
 
