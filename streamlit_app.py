@@ -19,7 +19,7 @@ def load_lottieurl(url):
     return r.json()
 
 
-lottie_animation = load_lottieurl('https://lottie.host/d9f965d0-4be7-4d22-a30f-6a47e4b21d21/WrGKrQJxly.json')
+lottie_animation = load_lottieurl('https://lottie.host/5ac92c74-1a02-40ff-ac96-947c14236db1/u4nCMW6fXU.json')
 
 
 ##### Pre-run services #####
@@ -151,42 +151,36 @@ class IntentService:
 
 def intent_orchestrator(service_class):
     """Orchestrates the process of checking if a question is related to any PDF content."""
+    user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
+    ask_button = st.button('Ask', key="ask_button")
 
-    while True:
-        user_question = st.text_input("Ask a question about the PDF content or type 'exit' to quit: ").strip()
-        ask_button = st.button('Ask')
-        
-        if user_question.lower() == 'exit' and ask_button:
-            st.write("Exiting...")
-            return None
-        
+    if ask_button:  # Ensure processing only occurs when the button is pressed
         is_flagged, message = service_class.detect_malicious_intent(user_question)
         st.write(message)
-        if is_flagged or is_flagged is None:  # Continue loop if flagged or an error occurred
-            continue
-        
+        if is_flagged or is_flagged is None:  # Skip further processing if flagged or an error occurred
+            return None
+
         related, message = service_class.check_relatedness_to_pdf_content(user_question)
         st.write(message)
-        vectorized_question = service_class.question_to_embeddings(user_question)            
-
         if related:
+            vectorized_question = service_class.question_to_embeddings(user_question)
             return vectorized_question, user_question
         else:
             st.write("Please try a different question...")
+            return None
 
 
-
-def process_user_question():
+def process_user_question(service_class):
     """Main function to start the question processing workflow."""
-    service_class = IntentService()
-    vectorized_question, question = intent_orchestrator(service_class)
-    if not vectorized_question:
-        st.error("Your question wasn't processed successfully...")
-    else:
+    result = intent_orchestrator(service_class)  # Store the return value in a variable
+
+    if result:
+        vectorized_question, question = result  # Unpack the result only if it's not None
         st.success("Your question was processed successfully...")
-        return vectorized_question, question
-    
-######
+        # rest of the logic if question is related or not flagged
+    else:
+        # If result is None, it means we should ask another question
+        pass  
 
 
 def main():
@@ -197,14 +191,9 @@ def main():
         # run the animation while process_pre_run is running
         with st_lottie_spinner(lottie_animation, quality='high', height='100px', width='100px'):
             process_pre_run(uploaded_file)
-        process_user_question()
 
-            
-
-
-
-
-
+        service_class = IntentService()  # Create an instance of the service class
+        process_user_question(service_class)  # Call this function once after PDF upload
 
 # Run the app
 if __name__ == '__main__':
