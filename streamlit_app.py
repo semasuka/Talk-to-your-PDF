@@ -22,14 +22,14 @@ def load_lottieurl(url):
 
 loading_animation = load_lottieurl('https://lottie.host/5ac92c74-1a02-40ff-ac96-947c14236db1/u4nCMW6fXU.json')
 
+##### Environment variables are loaded #####
 
-
+load_dotenv()
 
 ##### Pre-run services #####
 
 class PreRunProcessor:
     def __init__(self):
-        load_dotenv()
         openai.api_key = os.getenv("OPENAI_API_KEY")
         # Get PostgreSQL database from supabase platform
         self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
@@ -42,48 +42,7 @@ class PreRunProcessor:
         chunks = [text[i:i + chunk_length].replace('\n', '') for i in range(0, len(text), chunk_length)]
         return self._generate_embeddings(chunks)
 
-    # def define_vector_store(self, embeddings: list) -> bool:
-    #     session = self.Session()  # Create session instance
-    #     try:
-    #         # Truncate table and insert new embeddings
-    #         session.execute(text("TRUNCATE TABLE pdf_holder RESTART IDENTITY"))
-    #         for embedding in embeddings:
-    #             session.execute(text("INSERT INTO pdf_holder (text, embedding) VALUES (:text, :embedding)"),
-    #                             {"text": embedding["text"], "embedding": embedding["vector"]})
-    #         session.commit()  # Commit the transaction
-    #         return True  # Return True on success
-    #     except Exception as e:
-    #         session.rollback()  # Rollback in case of an error
-    #         print(f"An error occurred: {e}")
-    #         return False  # Return False on failure
-    #     finally:
-    #         session.close()  # Ensure the session is closed
-    # def define_vector_store(self, embeddings: list) -> bool:
-    #     session = self.Session()  # Create session instance
-    #     try:
-    #         # Check if the table exists before truncating
-    #         if session.execute(text("SELECT to_regclass('public.pdf_holder')")).scalar() is not None:
-    #             session.execute(text("TRUNCATE TABLE pdf_holder RESTART IDENTITY"))
-            
-    #         # Insert new embeddings
-    #         for embedding in embeddings:
-    #             # Ensure the embedding vector is the right type and size
-    #             embedding_vector = embedding["vector"]
-    #             if not isinstance(embedding_vector, list) or len(embedding_vector) != 3072:
-    #                 raise ValueError("Embedding vector must be a list of 3072 floats.")
-                
-    #             # Convert the embedding vector to a PostgreSQL array representation
-    #             embedding_array = "{" + ",".join(map(str, embedding_vector)) + "}"
-    #             session.execute(text("INSERT INTO pdf_holder (text, embedding) VALUES (:text, ARRAY[:embedding]::FLOAT[])"),
-    #                             {"text": embedding["text"], "embedding": embedding_array})
-    #         session.commit()  # Commit the transaction
-    #         return True  # Return True on success
-    #     except Exception as e:
-    #         session.rollback()  # Rollback in case of an error
-    #         print(f"An error occurred: {e}")
-    #         return False  # Return False on failure
-    #     finally:
-    #         session.close()  # Ensure the session is closed
+
     def define_vector_store(self, embeddings: list) -> bool:
         session = self.Session()  # Create session instance
         try:
@@ -142,9 +101,8 @@ def process_pre_run(uploaded_file):
 
 class IntentService:
     def __init__(self):
-        load_dotenv()
         self.api_key = os.getenv("OPENAI_API_KEY")
-        # Get PostgreSQL database from supabase platform
+        # Get PostgreSQL database from Supabase platform
         self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
 
 
@@ -201,7 +159,7 @@ class IntentService:
                 """), {'question_vector': question_vectorized}).fetchone()
 
                 if result:
-                    closest_id, _, distance = result
+                    _, _, distance = result
                     threshold = 0.5  # albritrary threshold that works well with my PDF, needs to test it out accordingly 
                     if distance < threshold:
                         return True, "Question is related to the PDF content..."
@@ -212,31 +170,60 @@ class IntentService:
         except Exception as e:
             print(f"Error searching the database: {e}")
             return False, f"Error searching the database: {e}"
+        
+        
+# Function to refresh Dropbox access token
+def refresh_dropbox_access_token(refresh_token, app_key, app_secret):
+    """Refresh the dropbox token so that it does not expire"""
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": app_key,
+        "client_secret": app_secret,
+    }
+    response = requests.post('https://api.dropboxapi.com/oauth2/token', data=data)
+    if response.status_code == 200:
+        new_access_token = response.json()['access_token']
+        # Optionally update the environment variable or store the new token as needed
+        os.environ["DROPBOX_ACCESS_TOKEN"] = new_access_token
+        return new_access_token
+    else:
+        raise Exception("Could not refresh the access token.")
 
 def upload_to_dropbox(file_stream, file_name):
-    # Load environment variables
-    load_dotenv()
+    """function to handle all the upload to Dropbox"""
+    DROPBOX_REFRESH_TOKEN = os.getenv("DROPBOX_REFRESH_TOKEN")
+    APP_KEY = os.getenv("DROPBOX_APP_KEY")
+    APP_SECRET = os.getenv("DROPBOX_APP_SECRET")
+    ACCESS_TOKEN = os.getenv("DROPBOX_ACCESS_TOKEN")
 
-    # Retrieve the access token from the environment variable
-    DROPBOX_ACCESS_TOKEN = os.getenv("DROPBOX_TOKEN")
-
-    if not DROPBOX_ACCESS_TOKEN:
-        raise ValueError("Missing access token. Please set the DROPBOX_ACCESS_TOKEN environment variable.")
-
-    dbx = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
-
-    # Try to upload the file and create a shared link
     try:
-        dbx.files_upload(file_stream.read(), '/' + file_name, mode=dropbox.files.WriteMode('overwrite'))
-        shared_link_metadata = dbx.sharing_create_shared_link_with_settings('/' + file_name)
-        return shared_link_metadata.url
-    except dropbox.exceptions.ApiError as err:
-        if isinstance(err.error, dropbox.sharing.CreateSharedLinkWithSettingsError) and err.error.is_shared_link_already_exists():
-            # Shared link already exists, get the existing shared link
-            link_metadata = dbx.sharing_list_shared_links(path='/' + file_name).links
-            return link_metadata[0].url if link_metadata else None
+        dbx = dropbox.Dropbox(ACCESS_TOKEN)
+        # Check if a shared link already exists for the file
+        existing_links = dbx.sharing_list_shared_links(path='/' + file_name).links
+        if existing_links:
+            # If links exist, return the URL of the first link
+            return existing_links[0].url
         else:
-            raise
+            # If no link exists, upload the file and create a new shared link
+            dbx.files_upload(file_stream.read(), '/' + file_name, mode=dropbox.files.WriteMode.overwrite)
+            shared_link_metadata = dbx.sharing_create_shared_link_with_settings('/' + file_name)
+            return shared_link_metadata.url
+    except dropbox.exceptions.AuthError:
+        # Refresh the access token if it has expired and retry
+        print("Access token expired, refreshing...")
+        new_access_token = refresh_dropbox_access_token(DROPBOX_REFRESH_TOKEN, APP_KEY, APP_SECRET)
+        dbx = dropbox.Dropbox(new_access_token)
+        # After refreshing the token, check again for existing shared links
+        existing_links = dbx.sharing_list_shared_links(path='/' + file_name).links
+        if existing_links:
+            return existing_links[0].url
+        else:
+            dbx.files_upload(file_stream.read(), '/' + file_name, mode=dropbox.files.WriteMode.overwrite)
+            shared_link_metadata = dbx.sharing_create_shared_link_with_settings('/' + file_name)
+            return shared_link_metadata.url
+
+
 
 def intent_orchestrator(service_class, user_question):
     """Orchestrates the process of checking if a question is related to any PDF content."""
@@ -272,10 +259,9 @@ def process_user_question(service_class, user_question):
 def main():
     st.title("Talk to your PDF")
 
+    
     uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
     if uploaded_file is not None:
-        
-
         # animation while uploading the PDF and processing the question
         with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
             process_pre_run(uploaded_file)
