@@ -4,6 +4,7 @@ import openai, os, requests, dropbox
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import ProgrammingError
 from pdfminer.high_level import extract_text as pdf_extract_text
 from streamlit_lottie import st_lottie_spinner
 
@@ -30,8 +31,8 @@ class PreRunProcessor:
     def __init__(self):
         load_dotenv()
         openai.api_key = os.getenv("OPENAI_API_KEY")
-        db_password = os.getenv("POSTGRES_PASSWORD")
-        self.engine = create_engine(f'postgresql://postgres:{db_password}@localhost:5432/pdf_db')
+        # Get PostgreSQL database from supabase platform
+        self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
         self.Session = sessionmaker(bind=self.engine)
 
     def pdf_to_text(self, uploaded_file, chunk_length: int = 1000) -> list:
@@ -41,19 +42,77 @@ class PreRunProcessor:
         chunks = [text[i:i + chunk_length].replace('\n', '') for i in range(0, len(text), chunk_length)]
         return self._generate_embeddings(chunks)
 
+    # def define_vector_store(self, embeddings: list) -> bool:
+    #     session = self.Session()  # Create session instance
+    #     try:
+    #         # Truncate table and insert new embeddings
+    #         session.execute(text("TRUNCATE TABLE pdf_holder RESTART IDENTITY"))
+    #         for embedding in embeddings:
+    #             session.execute(text("INSERT INTO pdf_holder (text, embedding) VALUES (:text, :embedding)"),
+    #                             {"text": embedding["text"], "embedding": embedding["vector"]})
+    #         session.commit()  # Commit the transaction
+    #         return True  # Return True on success
+    #     except Exception as e:
+    #         session.rollback()  # Rollback in case of an error
+    #         print(f"An error occurred: {e}")
+    #         return False  # Return False on failure
+    #     finally:
+    #         session.close()  # Ensure the session is closed
+    # def define_vector_store(self, embeddings: list) -> bool:
+    #     session = self.Session()  # Create session instance
+    #     try:
+    #         # Check if the table exists before truncating
+    #         if session.execute(text("SELECT to_regclass('public.pdf_holder')")).scalar() is not None:
+    #             session.execute(text("TRUNCATE TABLE pdf_holder RESTART IDENTITY"))
+            
+    #         # Insert new embeddings
+    #         for embedding in embeddings:
+    #             # Ensure the embedding vector is the right type and size
+    #             embedding_vector = embedding["vector"]
+    #             if not isinstance(embedding_vector, list) or len(embedding_vector) != 3072:
+    #                 raise ValueError("Embedding vector must be a list of 3072 floats.")
+                
+    #             # Convert the embedding vector to a PostgreSQL array representation
+    #             embedding_array = "{" + ",".join(map(str, embedding_vector)) + "}"
+    #             session.execute(text("INSERT INTO pdf_holder (text, embedding) VALUES (:text, ARRAY[:embedding]::FLOAT[])"),
+    #                             {"text": embedding["text"], "embedding": embedding_array})
+    #         session.commit()  # Commit the transaction
+    #         return True  # Return True on success
+    #     except Exception as e:
+    #         session.rollback()  # Rollback in case of an error
+    #         print(f"An error occurred: {e}")
+    #         return False  # Return False on failure
+    #     finally:
+    #         session.close()  # Ensure the session is closed
     def define_vector_store(self, embeddings: list) -> bool:
         session = self.Session()  # Create session instance
         try:
             # Truncate table and insert new embeddings
-            session.execute(text("TRUNCATE TABLE pdf_holder RESTART IDENTITY"))
+            session.execute(text("TRUNCATE TABLE pdf_holder RESTART IDENTITY CASCADE;"))
             for embedding in embeddings:
                 session.execute(text("INSERT INTO pdf_holder (text, embedding) VALUES (:text, :embedding)"),
                                 {"text": embedding["text"], "embedding": embedding["vector"]})
             session.commit()  # Commit the transaction
             return True  # Return True on success
-        except Exception as e:
-            session.rollback()  # Rollback in case of an error
-            return False  # Return False on failure
+        except ProgrammingError as e:
+            if 'relation "pdf_holder" does not exist' in str(e.orig.pgerror):
+                session.rollback()  # Rollback in case of an error
+                # create the vector extension in Supabase
+                session.execute(text("""
+                    CREATE EXTENSION IF NOT EXISTS vector;
+                """))
+                # Create the table if it doesn't exist
+                session.execute(text("""
+                    CREATE TABLE pdf_holder (
+                        id SERIAL PRIMARY KEY,
+                        text TEXT,
+                        embedding VECTOR(3072)
+                    );
+                """))
+                session.commit()
+                return False  # Return False on failure
+            else:
+                raise
         finally:
             session.close()  # Ensure the session is closed
 
@@ -85,8 +144,10 @@ class IntentService:
     def __init__(self):
         load_dotenv()
         self.api_key = os.getenv("OPENAI_API_KEY")
-        # Get database password from environment variable
-        self.engine = create_engine(f'postgresql://postgres:{os.getenv("POSTGRES_PASSWORD")}@localhost:5432/pdf_db')
+        # Get PostgreSQL database from supabase platform
+        self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
+
+
 
     def detect_malicious_intent(self, question):
         """Uses OpenAI's moderation model to detect malicious intent in a question."""
@@ -209,7 +270,7 @@ def process_user_question(service_class, user_question):
         
         
 def main():
-    st.title("Talk to Your PDF")
+    st.title("Talk to your PDF")
 
     uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
     if uploaded_file is not None:
