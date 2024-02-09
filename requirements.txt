@@ -1,9 +1,8 @@
 streamlit
 numpy
 openai
-os
 requests
 dropbox
-dotenv
+python-dotenv
 sqlalchemy
 streamlit_lottie
