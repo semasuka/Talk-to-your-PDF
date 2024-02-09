@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from pdfminer.high_level import extract_text as pdf_extract_text
 from streamlit_lottie import st_lottie_spinner
+from dropbox.exceptions import ApiError
 
 
 
@@ -274,6 +275,11 @@ def upload_to_dropbox(file_stream, file_name):
             dbx.files_upload(file_stream.read(), '/' + file_name, mode=dropbox.files.WriteMode.overwrite)
             shared_link_metadata = dbx.sharing_create_shared_link_with_settings('/' + file_name)
             return shared_link_metadata.url
+    
+    except ApiError as api_error:
+        st.error(f"Dropbox API Error: {api_error}")
+        # Optionally, re-raise the error or handle it based on your app's needs
+        raise
 
 
 def intent_orchestrator(service_class, user_question):
