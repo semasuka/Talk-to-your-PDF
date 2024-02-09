@@ -10,6 +10,7 @@ from streamlit_lottie import st_lottie_spinner
 
 
 
+
 ##### Animation #####
 
 @st.cache_data
@@ -172,9 +173,37 @@ class IntentService:
             return False, f"Error searching the database: {e}"
         
         
-# Function to refresh Dropbox access token
+##### Information retrieval service #####
+
+class InformationRetrievalService:
+    def __init__(self):
+        load_dotenv()
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        db_password = os.getenv("POSTGRES_PASSWORD")
+        self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
+        self.Session = sessionmaker(bind=self.engine)
+
+    def search_in_vector_store(self, vectorized_question: str, k: int = 1) -> str:
+        sql_query = text("""
+            SELECT id, text, embedding <=> CAST(:query_vector AS VECTOR) AS distance
+            FROM pdf_holder
+            ORDER BY distance
+            LIMIT :k
+        """)
+        with self.engine.connect() as conn:
+            results = conn.execute(sql_query, {'query_vector': vectorized_question, 'k': k}).fetchall()
+            if results:
+                # Accessing the 'text' column correctly in the first result row
+                return results[0].text
+            else:
+                st.error("No matching documents found.")
+
+
+
+
+
 def refresh_dropbox_access_token(refresh_token, app_key, app_secret):
-    """Refresh the dropbox token so that it does not expire"""
+    """Function to refresh Dropbox access token"""
     data = {
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
@@ -224,7 +253,6 @@ def upload_to_dropbox(file_stream, file_name):
             return shared_link_metadata.url
 
 
-
 def intent_orchestrator(service_class, user_question):
     """Orchestrates the process of checking if a question is related to any PDF content."""
     is_flagged, flag_message = service_class.detect_malicious_intent(user_question)
@@ -239,7 +267,7 @@ def intent_orchestrator(service_class, user_question):
     if related:
         vectorized_question = service_class.question_to_embeddings(user_question)
         st.write(relatedness_message)
-        st.success("Your question was processed successfully. Now fetching an answer.")
+        st.success("Your question was processed successfully. Now fetching an answer...")
         return vectorized_question, user_question
     else:
         st.write(relatedness_message)
@@ -251,9 +279,15 @@ def process_user_question(service_class, user_question):
     result = intent_orchestrator(service_class, user_question)
 
     if result:
-        vectorized_question, question = result
-        # Implement what should happen once the question is processed
-        # ...
+        return result
+        
+
+def process_retrieval(vectorized_question: str) -> tuple:
+    """Function to start the question processing workflow."""
+    service = InformationRetrievalService()
+    retrieved_info = service.search_in_vector_store(vectorized_question)
+    return retrieved_info
+
         
         
 def main():
@@ -279,8 +313,11 @@ def main():
             submit_button = st.form_submit_button(label='Ask')
 
         if submit_button:
-            process_user_question(service_class, user_question)
-
+            vectorized_question, question = process_user_question(service_class, user_question)
+            retrieved_info = process_retrieval(vectorized_question)
+            st.write(retrieved_info)
+            
+            
 # Run the app
 if __name__ == '__main__':
     main()
