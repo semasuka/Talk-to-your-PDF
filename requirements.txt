@@ -1,0 +1,9 @@
+streamlit
+numpy
+openai
+os
+requests
+dropbox
+dotenv
+sqlalchemy
+streamlit_lottie
