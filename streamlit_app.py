@@ -198,8 +198,31 @@ class InformationRetrievalService:
             else:
                 st.error("No matching documents found.")
 
+##### Response service #####
 
+class ResponseService:
+    """Handles generating responses based on user questions and provided facts."""
+    
+    def __init__(self):
+        load_dotenv()
+        openai.api_key = os.getenv("OPENAI_API_KEY")
 
+    def generate_response(self, question, retrieved_info):
+        """Generates a response from OpenAI's ChatCompletion based on facts and a user question."""
+        # call the openai ChatCompletion endpoint
+        response = openai.chat.completions.create(
+        model="gpt-4-turbo-preview",
+        messages=[
+                {"role": "user", "content": 'Based on the FACTS, give a concise and detailed answer to the QUESTION.'+ 
+                f'QUESTION: {question}. FACTS: {retrieved_info}'}
+            ]
+        )
+
+        if response.choices and response.choices:
+            return response.choices[0].message.content
+        st.error("No content available.")
+        
+###### Independant & dependant of the function's class ######
 
 
 def refresh_dropbox_access_token(refresh_token, app_key, app_secret):
@@ -260,7 +283,7 @@ def intent_orchestrator(service_class, user_question):
 
     if is_flagged:
         st.error("Your question was not processed. Please try a different question.")
-        return None
+        return (None, None)
 
     related, relatedness_message = service_class.check_relatedness_to_pdf_content(user_question)
 
@@ -268,16 +291,15 @@ def intent_orchestrator(service_class, user_question):
         vectorized_question = service_class.question_to_embeddings(user_question)
         st.write(relatedness_message)
         st.success("Your question was processed successfully. Now fetching an answer...")
-        return vectorized_question, user_question
+        return (vectorized_question, user_question)
     else:
         st.write(relatedness_message)
         st.error("Your question was not processed. Please try a different question.")
-        return None
+        return (None, None)
 
 def process_user_question(service_class, user_question):
     """Main function to start the question processing workflow."""
     result = intent_orchestrator(service_class, user_question)
-
     if result:
         return result
         
@@ -288,6 +310,12 @@ def process_retrieval(vectorized_question: str) -> tuple:
     retrieved_info = service.search_in_vector_store(vectorized_question)
     return retrieved_info
 
+
+def process_response(retrieved_info, question):
+    """Function to return a well formatted question."""
+    response_service_processor = ResponseService()
+    final_response = response_service_processor.generate_response(question, retrieved_info)
+    return final_response
         
         
 def main():
@@ -313,10 +341,15 @@ def main():
             submit_button = st.form_submit_button(label='Ask')
 
         if submit_button:
-            vectorized_question, question = process_user_question(service_class, user_question)
-            retrieved_info = process_retrieval(vectorized_question)
-            st.write(retrieved_info)
+            result = process_user_question(service_class, user_question)
+            if result[0] is not None:  # Check if the first element of the tuple is not None
+                vectorized_question, question = result
+                with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
+                    retrieved_info = process_retrieval(vectorized_question)
+                    final_response = process_response(retrieved_info, question)
+                    st.write(final_response)
             
+
             
 # Run the app
 if __name__ == '__main__':
