@@ -1,0 +1,12 @@
+client_config_backend: file
+client_config_file: credentials.json
+save_credentials: True
+save_credentials_backend: file
+save_credentials_file: credentials_storage.json
+redirect_uris: 
+  - "http://localhost:8501"
+  - "https://talk-to-your-pdf.streamlit.app"
+get_refresh_token: True
+oauth_scope:
+  - https://www.googleapis.com/auth/drive.file
+  - https://www.googleapis.com/auth/drive.metadata.readonly

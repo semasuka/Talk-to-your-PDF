@@ -2,7 +2,7 @@ streamlit
 numpy
 openai
 requests
-dropbox
+pydrive
 python-dotenv
 sqlalchemy
 pdfminer.six

@@ -1,13 +1,14 @@
 import streamlit as st
 import numpy as np
-import openai, os, requests, dropbox
+import openai, os, requests
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from pdfminer.high_level import extract_text as pdf_extract_text
 from streamlit_lottie import st_lottie_spinner
-from dropbox.exceptions import ApiError
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 
 
@@ -226,61 +227,18 @@ class ResponseService:
 ###### Independant & dependant of the function's class ######
 
 
-def refresh_dropbox_access_token(refresh_token, app_key, app_secret):
-    """Function to refresh Dropbox access token"""
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": app_key,
-        "client_secret": app_secret,
-    }
-    response = requests.post('https://api.dropboxapi.com/oauth2/token', data=data)
-    if response.status_code == 200:
-        new_access_token = response.json()['access_token']
-        # Optionally update the environment variable or store the new token as needed
-        os.environ["DROPBOX_ACCESS_TOKEN"] = new_access_token
-        return new_access_token
-    else:
-        raise Exception("Could not refresh the access token.")
+# Function to authenticate and upload a file to Google Drive
+def upload_to_google_drive(file_stream, file_name):
+    gauth = GoogleAuth(settings_file='settings.yaml')
+    gauth.LocalWebserverAuth()  # Creates local webserver for authentication
+    drive = GoogleDrive(gauth)
 
-def upload_to_dropbox(file_stream, file_name):
-    """function to handle all the upload to Dropbox"""
-    DROPBOX_REFRESH_TOKEN = os.getenv("DROPBOX_REFRESH_TOKEN")
-    APP_KEY = os.getenv("DROPBOX_APP_KEY")
-    APP_SECRET = os.getenv("DROPBOX_APP_SECRET")
-    ACCESS_TOKEN = os.getenv("DROPBOX_ACCESS_TOKEN")
+    file_drive = drive.CreateFile({'title': file_name})
+    file_drive.SetContentString(file_stream.read())
+    file_drive.Upload()
+    return file_drive['id']  # Returns the file ID after uploading
 
-    try:
-        dbx = dropbox.Dropbox(ACCESS_TOKEN)
-        # Check if a shared link already exists for the file
-        existing_links = dbx.sharing_list_shared_links(path='/' + file_name).links
-        if existing_links:
-            # If links exist, return the URL of the first link
-            return existing_links[0].url
-        else:
-            # If no link exists, upload the file and create a new shared link
-            dbx.files_upload(file_stream.read(), '/' + file_name, mode=dropbox.files.WriteMode.overwrite)
-            shared_link_metadata = dbx.sharing_create_shared_link_with_settings('/' + file_name)
-            return shared_link_metadata.url
-    except dropbox.exceptions.AuthError:
-        # Refresh the access token if it has expired and retry
-        print("Access token expired, refreshing...")
-        new_access_token = refresh_dropbox_access_token(DROPBOX_REFRESH_TOKEN, APP_KEY, APP_SECRET)
-        dbx = dropbox.Dropbox(new_access_token)
-        # After refreshing the token, check again for existing shared links
-        existing_links = dbx.sharing_list_shared_links(path='/' + file_name).links
-        if existing_links:
-            return existing_links[0].url
-        else:
-            dbx.files_upload(file_stream.read(), '/' + file_name, mode=dropbox.files.WriteMode.overwrite)
-            shared_link_metadata = dbx.sharing_create_shared_link_with_settings('/' + file_name)
-            return shared_link_metadata.url
-    
-    except ApiError as api_error:
-        st.error(f"Dropbox API Error: {api_error}")
-        # Optionally, re-raise the error or handle it based on your app's needs
-        raise
-
+    # Generate a shareable link or handle the uploaded file as needed
 
 def intent_orchestrator(service_class, user_question):
     """Orchestrates the process of checking if a question is related to any PDF content."""
@@ -334,9 +292,9 @@ def main():
         with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
             process_pre_run(uploaded_file)
         
-        share_link = upload_to_dropbox(uploaded_file, uploaded_file.name)
+        file_id = upload_to_google_drive(uploaded_file, uploaded_file.name)
         # Use markdown to display the hyperlink
-        st.markdown(f'PDF file can be found [here]({share_link}).', unsafe_allow_html=True)
+        st.markdown(f'PDF file can be found [here]({file_id}).', unsafe_allow_html=True)
             
 
         service_class = IntentService()  # Create an instance of the service class
