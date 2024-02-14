@@ -9,4 +9,3 @@ sqlalchemy
 pdfminer.six
 streamlit_lottie
 psycopg2-binary
-json
