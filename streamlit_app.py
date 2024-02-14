@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-import openai, os, requests
+import openai, os, requests, tempfile
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -9,7 +9,7 @@ from pdfminer.high_level import extract_text as pdf_extract_text
 from streamlit_lottie import st_lottie_spinner
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
-
+from oauth2client.service_account import ServiceAccountCredentials
 
 
 
@@ -181,7 +181,6 @@ class InformationRetrievalService:
     def __init__(self):
         load_dotenv()
         openai.api_key = os.getenv("OPENAI_API_KEY")
-        db_password = os.getenv("POSTGRES_PASSWORD")
         self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
         self.Session = sessionmaker(bind=self.engine)
 
@@ -227,18 +226,33 @@ class ResponseService:
 ###### Independant & dependant of the function's class ######
 
 
-# Function to authenticate and upload a file to Google Drive
-def upload_to_google_drive(file_stream, file_name):
-    gauth = GoogleAuth(settings_file='settings.yaml')
-    gauth.LocalWebserverAuth()  # Creates local webserver for authentication
+# Function to securely upload a file to Google Drive and delete the temporary file
+def upload_to_google_drive(uploaded_file):
+    # Define the scope for Google Drive API
+    scope = ['https://www.googleapis.com/auth/drive.file']
+    # Load service account credentials
+    credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+    
+    # Authenticate with Google Drive
+    gauth = GoogleAuth()
+    gauth.credentials = credentials
     drive = GoogleDrive(gauth)
-
-    file_drive = drive.CreateFile({'title': file_name})
-    file_drive.SetContentString(file_stream.read())
-    file_drive.Upload()
-    return file_drive['id']  # Returns the file ID after uploading
-
-    # Generate a shareable link or handle the uploaded file as needed
+    
+    # Create a secure temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='-' + uploaded_file.name) as temp_file:
+        # Write the content of the uploaded file to the temporary file
+        temp_file.write(uploaded_file.read())
+        temp_file_path = temp_file.name  # Store the path to the temporary file
+    
+    try:
+        # Upload the file to Google Drive using the temporary file's path
+        file_drive = drive.CreateFile({'title': uploaded_file.name})
+        file_drive.SetContentFile(temp_file_path)
+        file_drive.Upload()
+        return file_drive['id']  # Return the file ID after uploading
+    finally:
+        # Securely delete the temporary file
+        os.unlink(temp_file_path)
 
 def intent_orchestrator(service_class, user_question):
     """Orchestrates the process of checking if a question is related to any PDF content."""
@@ -292,9 +306,7 @@ def main():
         with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
             process_pre_run(uploaded_file)
         
-        file_id = upload_to_google_drive(uploaded_file, uploaded_file.name)
-        # Use markdown to display the hyperlink
-        st.markdown(f'PDF file can be found [here]({file_id}).', unsafe_allow_html=True)
+        file_id = upload_to_google_drive(uploaded_file)
             
 
         service_class = IntentService()  # Create an instance of the service class

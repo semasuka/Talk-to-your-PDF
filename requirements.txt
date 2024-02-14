@@ -4,6 +4,7 @@ openai
 requests
 pydrive
 python-dotenv
+oauth2client
 sqlalchemy
 pdfminer.six
 streamlit_lottie
