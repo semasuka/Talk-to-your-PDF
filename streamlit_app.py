@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-import openai, os, requests, tempfile
+import openai, os, requests, tempfile, json
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -230,8 +230,14 @@ class ResponseService:
 def upload_to_google_drive(uploaded_file):
     # Define the scope for Google Drive API
     scope = ['https://www.googleapis.com/auth/drive.file']
-    # Load service account credentials
-    credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+    # Load and parse the Google Drive API credentials from Streamlit secrets (TOML format)
+    credentials_info = st.secrets["google_credentials"]
+
+    # Convert the credentials info into a JSON-like dictionary that can be used with oauth2client
+    credentials_dict = {key: value for key, value in credentials_info.items()}
+
+    # Use the credentials to authenticate
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     
     # Authenticate with Google Drive
     gauth = GoogleAuth()
