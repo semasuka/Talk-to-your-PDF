@@ -1,6 +1,7 @@
+# Import necessary libraries
 import streamlit as st
 import numpy as np
-import openai, os, requests, tempfile, json
+import openai, os, requests, tempfile
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -11,59 +12,86 @@ from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
 
-
-
-##### Animation #####
-
-@st.cache_data
-def load_lottieurl(url):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-
-loading_animation = load_lottieurl('https://lottie.host/5ac92c74-1a02-40ff-ac96-947c14236db1/u4nCMW6fXU.json')
-
-##### Environment variables are loaded #####
-
+# Load environment variables
 load_dotenv()
 
-##### Pre-run services #####
+# Function to load Lottie animations using URL
+@st.cache_data
+def load_lottieurl(url):
+    """
+    Fetches and caches a Lottie animation from a provided URL.
 
+    Args:
+    url (str): The URL of the Lottie animation.
+
+    Returns:
+    dict: The Lottie animation JSON or None if the request fails.
+    """
+    r = requests.get(url)  # Perform the GET request
+    if r.status_code != 200:
+        return None  # Return None if request failed
+    return r.json()  # Return the JSON content of the Lottie animation
+
+# Load a specific Lottie animation to be used in the app
+loading_animation = load_lottieurl('https://lottie.host/5ac92c74-1a02-40ff-ac96-947c14236db1/u4nCMW6fXU.json')
+
+# Class for processing uploaded PDFs before user interaction
 class PreRunProcessor:
+    """
+    Processes uploaded PDF files by extracting text and generating embeddings.
+    """
     def __init__(self):
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        # Get PostgreSQL database from supabase platform
+        """
+        Initializes the processor with an OpenAI API key and a connection to a PostgreSQL database.
+        """
+        # Load OpenAI API key from environment variables
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        # Establish connection to the PostgreSQL database from the Supabase platform
         self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
+        # Create a session maker bound to this engine
         self.Session = sessionmaker(bind=self.engine)
 
     def pdf_to_text(self, uploaded_file, chunk_length: int = 1000) -> list:
+        """
+        Extracts text from the uploaded PDF and splits it into manageable chunks.
 
-        # Use pdfminer's extract_text function
+        Args:
+        uploaded_file (UploadedFile): The PDF file uploaded by the user.
+        chunk_length (int): The desired length of each text chunk.
+
+        Returns:
+        list: A list of text chunks ready for embedding generation.
+        """
+        # Extract text from the uploaded PDF
         text = pdf_extract_text(uploaded_file)
+        # Split the text into chunks
         chunks = [text[i:i + chunk_length].replace('\n', '') for i in range(0, len(text), chunk_length)]
         return self._generate_embeddings(chunks)
 
-
     def define_vector_store(self, embeddings: list) -> bool:
-        session = self.Session()  # Create session instance
+        """
+        Stores the generated embeddings in the database.
+
+        Args:
+        embeddings (list): A list of dictionaries containing text and their corresponding embeddings.
+
+        Returns:
+        bool: True if the operation succeeds, False otherwise.
+        """
+        session = self.Session()  # Create a new database session
         try:
-            # Truncate table and insert new embeddings
+            # Truncate the existing table and insert new embeddings
             session.execute(text("TRUNCATE TABLE pdf_holder RESTART IDENTITY CASCADE;"))
             for embedding in embeddings:
-                session.execute(text("INSERT INTO pdf_holder (text, embedding) VALUES (:text, :embedding)"),
-                                {"text": embedding["text"], "embedding": embedding["vector"]})
-            session.commit()  # Commit the transaction
-            return True  # Return True on success
+                # Insert each embedding into the pdf_holder table
+                session.execute(text("INSERT INTO pdf_holder (text, embedding) VALUES (:text, :embedding)"), {"text": embedding["text"], "embedding": embedding["vector"]})
+            session.commit()  # Commit the changes
+            return True
         except ProgrammingError as e:
             if 'relation "pdf_holder" does not exist' in str(e.orig.pgerror):
-                session.rollback()  # Rollback in case of an error
-                # create the vector extension in Supabase
-                session.execute(text("""
-                    CREATE EXTENSION IF NOT EXISTS vector;
-                """))
-                # Create the table if it doesn't exist
+                # If the table doesn't exist, create it and the necessary extension
+                session.rollback()
+                session.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
                 session.execute(text("""
                     CREATE TABLE pdf_holder (
                         id SERIAL PRIMARY KEY,
@@ -72,105 +100,170 @@ class PreRunProcessor:
                     );
                 """))
                 session.commit()
-                return False  # Return False on failure
+                return False
             else:
                 raise
         finally:
-            session.close()  # Ensure the session is closed
+            session.close()  # Close the session
 
     def _generate_embeddings(self, chunks: list) -> list:
+        """
+        Generates embeddings for each text chunk using the OpenAI API.
+
+        Args:
+        chunks (list): A list of text chunks.
+
+        Returns:
+        list: A list of dictionaries containing text chunks and their corresponding embeddings.
+        """
         try:
+            # Generate embeddings for the text chunks
             response = openai.embeddings.create(model='text-embedding-3-large', input=chunks)
-            return [{"vector": embedding_info.embedding, "text": chunks[embedding_info.index]}
-                    for embedding_info in response.data]
+            return [{"vector": embedding_info.embedding, "text": chunks[embedding_info.index]} for embedding_info in response.data]
         except Exception as e:
             st.error(f"An error occurred during embeddings generation: {e}")
             return []
 
+# Function to process the uploaded PDF before any user interaction
 def process_pre_run(uploaded_file):
-    processor_class = PreRunProcessor()
-    # Pass each file to the pdf_to_text function
-    embeddings = processor_class.pdf_to_text(uploaded_file)
+    """
+    Orchestrates the preprocessing of the uploaded PDF file, including text extraction and embedding generation.
+
+    Args:
+    uploaded_file (UploadedFile): The PDF file uploaded by the user.
+    """
+    processor_class = PreRunProcessor()  # Instantiate the PreRunProcessor class
+    embeddings = processor_class.pdf_to_text(uploaded_file)  # Extract text and generate embeddings
     if not embeddings or not processor_class.define_vector_store(embeddings):
-        st.error("Failed to store the PDF embedding.")
+        st.error("Failed to store the PDF embedding.")  # Notify if embedding storage fails
     else:
-        st.success("PDF successfully uploaded. We can proceed now...")
+        st.success("PDF successfully uploaded. We can proceed now...")  # Notify on successful processing
+
 
 
 
 
 ##### Intent services #####
 
-
 class IntentService:
+    """
+    Handles the detection of malicious intent in user queries, conversion of questions to embeddings,
+    and checks the relatedness of questions to PDF content via database queries.
+    """
+    
     def __init__(self):
+        """
+        Initializes the IntentService with the OpenAI API key and a connection to a PostgreSQL database.
+        """
+        # Retrieve OpenAI API key from environment variables
         self.api_key = os.getenv("OPENAI_API_KEY")
-        # Get PostgreSQL database from Supabase platform
+        # Establish a connection to the PostgreSQL database hosted on the Supabase platform
         self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
 
-
-
     def detect_malicious_intent(self, question):
-        """Uses OpenAI's moderation model to detect malicious intent in a question."""
+        """
+        Uses OpenAI's moderation model to detect malicious intent in a user's question.
+
+        Args:
+            question (str): The user's question as a string.
+
+        Returns:
+            tuple: A boolean indicating if the question was flagged and a message explaining the result.
+        """
         try:
-            response = openai.moderations.create(
-                model="text-moderation-latest",
-                input=question,
-            )
+            # Create a moderation request to OpenAI API with the provided question
+            response = openai.moderations.create(model="text-moderation-latest", input=question)
+            # Determine if the question was flagged as malicious
             is_flagged = response.results[0].flagged
             if is_flagged:
+                # Return true and a message if flagged
                 return is_flagged, "This question has been flagged for malicious or inappropriate content..."
             else:
+                # Return false and a message if not flagged
                 return is_flagged, "No malicious intent detected..."
         except Exception as e:
+            # Return none and an error message in case of an exception
             return None, f"Error in moderation: {str(e).split('. ')[0]}."
-        
+
     def query_database(self, query):
-        """Executes a given query on the database."""
+        """
+        Executes a SQL query on the connected PostgreSQL database and returns the first result.
+
+        Args:
+            query (str): SQL query string to be executed.
+
+        Returns:
+            sqlalchemy.engine.row.RowProxy or None: The first result row of the query or None if no results.
+        """
+        # Connect to the database and execute the given query
         with self.engine.connect() as connection:
             result = connection.execute(text(query)).fetchone()
+            # Return the result if available; otherwise, return None
             return result if result else None
     
     def question_to_embeddings(self, question):
-        """Converts a question to embeddings."""
+        """
+        Converts a user's question into vector embeddings using OpenAI's API.
+
+        Args:
+            question (str): The user's question as a string.
+
+        Returns:
+            list: The vectorized form of the question as a list or an empty list on failure.
+        """
         try:
+            # Generate embeddings for the question using OpenAI's API
             response = openai.embeddings.create(input=question, model="text-embedding-3-large")
             embedded_query = response.data[0].embedding
-            # Ensure the embedding matches the expected dimensionality of 3072
+            # Verify the dimensionality of the embedding
             if len(embedded_query) != 3072:
                 raise ValueError("The dimensionality of the question embedding does not match the expected 3072 dimensions.")
             else:
-                question_vectorized = np.array(embedded_query, dtype=np.float64).tolist()
-                return question_vectorized
+                # Convert the embedding to a numpy array and return it as a list
+                return np.array(embedded_query, dtype=np.float64).tolist()
         except Exception as e:
+            # Log and return an empty list in case of an error
             print(f"Error embedding the question: {e}")
-            return [] # Return an empty list if no data is found in the response
+            return []
 
     def check_relatedness_to_pdf_content(self, question):
-        """Checks if the question is related to the PDF content by querying a database."""
+        """
+        Determines if a user's question is related to PDF content stored in the database by querying for similar embeddings.
+
+        Args:
+            question (str): The user's question as a string.
+
+        Returns:
+            tuple: A boolean indicating relatedness and a message explaining the result.
+        """
+        # Convert the question to vector embeddings
         question_vectorized = self.question_to_embeddings(question)
-
+        
         try:
-
+            # Query the database for the closest embedding to the question's embedding
             with self.engine.connect() as conn:
-                # Use the vector in your query with the <=> operator for cosine distance
                 result = conn.execute(text("""
                     SELECT id, text, embedding <=> CAST(:question_vector AS VECTOR) AS distance 
                     FROM pdf_holder
                     ORDER BY distance ASC
                     LIMIT 1;
                 """), {'question_vector': question_vectorized}).fetchone()
-
+                
                 if result:
+                    # Determine if the closest embedding is below a certain threshold
                     _, _, distance = result
-                    threshold = 0.5  # albritrary threshold that works well with my PDF, needs to test it out accordingly 
+                    threshold = 0.5  # Define a threshold for relatedness
                     if distance < threshold:
+                        # Return true and a message if the question is related to the PDF content
                         return True, "Question is related to the PDF content..."
                     else:
+                        # Return false and a message if the question is not sufficiently related
                         return False, "Question is not related to the PDF content..."
                 else:
+                    # Return false and a message if no embedding was found in the database
                     return False, "No match found in the database."
         except Exception as e:
+            # Log and return false in case of an error during the database query
             print(f"Error searching the database: {e}")
             return False, f"Error searching the database: {e}"
         
@@ -178,161 +271,261 @@ class IntentService:
 ##### Information retrieval service #####
 
 class InformationRetrievalService:
+    """
+    Provides services for searching vectorized questions within a vector store in the database.
+    """
+    
     def __init__(self):
-        load_dotenv()
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        """
+        Initializes the InformationRetrievalService with OpenAI API key and database connection.
+        """
+        # Retrieve OpenAI API key from environment variables
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        # Establish connection to the PostgreSQL database on the Supabase platform
         self.engine = create_engine(os.getenv("SUPABASE_POSTGRES_URL"), echo=True, client_encoding='utf8')
+        # Create a session maker bound to this engine
         self.Session = sessionmaker(bind=self.engine)
 
     def search_in_vector_store(self, vectorized_question: str, k: int = 1) -> str:
+        """
+        Searches for the closest matching text in the vector store to a given vectorized question.
+        
+        Args:
+            vectorized_question (str): The question converted into a vector.
+            k (int): The number of top results to retrieve, defaults to 1.
+        
+        Returns:
+            str: The text of the closest matching document or an error message if no match is found.
+        """
+        # SQL query to find the closest match in the vector store
         sql_query = text("""
             SELECT id, text, embedding <=> CAST(:query_vector AS VECTOR) AS distance
             FROM pdf_holder
             ORDER BY distance
             LIMIT :k
         """)
+        # Execute the query with provided vectorized question and k value
         with self.engine.connect() as conn:
             results = conn.execute(sql_query, {'query_vector': vectorized_question, 'k': k}).fetchall()
             if results:
-                # Accessing the 'text' column correctly in the first result row
+                # Return the text of the closest match if results are found
                 return results[0].text
             else:
+                # Display an error if no matching documents are found
                 st.error("No matching documents found.")
 
 ##### Response service #####
-
 class ResponseService:
-    """Handles generating responses based on user questions and provided facts."""
+    """
+    Generates responses to user questions by integrating with OpenAI's ChatCompletion.
+    """
     
     def __init__(self):
-        load_dotenv()
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        """
+        Initializes the ResponseService with the OpenAI API key.
+        """
+        # Load OpenAI API key from environment variables
+        self.api_key = os.getenv("OPENAI_API_KEY")
 
     def generate_response(self, question, retrieved_info):
-        """Generates a response from OpenAI's ChatCompletion based on facts and a user question."""
-        # call the openai ChatCompletion endpoint
+        """
+        Generates a response using OpenAI's ChatCompletion API based on the provided question and retrieved information.
+        
+        Args:
+            question (str): The user's question.
+            retrieved_info (str): Information retrieved that is related to the question.
+        
+        Returns:
+            str: The generated response or an error message if no response is available.
+        """
+        # Generate a response using the ChatCompletion API with the question and retrieved information
         response = openai.chat.completions.create(
-        model="gpt-4-turbo-preview",
-        messages=[
+            model="gpt-4-turbo-preview",
+            messages=[
                 {"role": "user", "content": 'Based on the FACTS, give a concise and detailed answer to the QUESTION.'+ 
                 f'QUESTION: {question}. FACTS: {retrieved_info}'}
             ]
         )
 
-        if response.choices and response.choices:
+        if response.choices and response.choices[0].message.content:
+            # Return the generated response if available
             return response.choices[0].message.content
-        st.error("No content available.")
+        else:
+            # Display an error if no content is generated
+            st.error("No content available.")
         
 ###### Independant & dependant of the function's class ######
 
-
-# Function to securely upload a file to Google Drive and delete the temporary file
+# Securely uploads a file to Google Drive and ensures the temporary file is deleted after upload
 def upload_to_google_drive(uploaded_file):
-    # Define the scope for Google Drive API
-    scope = ['https://www.googleapis.com/auth/drive.file']
-    # Load and parse the Google Drive API credentials from Streamlit secrets (TOML format)
-    credentials_info = st.secrets["google_credentials"]
-
-    # Convert the credentials info into a JSON-like dictionary that can be used with oauth2client
-    credentials_dict = {key: value for key, value in credentials_info.items()}
-
-    # Use the credentials to authenticate
-    credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+    """
+    Uploads a file to Google Drive using service account credentials and deletes the temporary file.
     
-    # Authenticate with Google Drive
+    Args:
+        uploaded_file: The file uploaded by the user through the Streamlit interface.
+    
+    Returns:
+        The Google Drive file ID of the uploaded file.
+    """
+    # Define the scope for Google Drive API access
+    scope = ['https://www.googleapis.com/auth/drive.file']
+    # Load Google Drive API credentials from Streamlit secrets (TOML format)
+    credentials_info = st.secrets["google_credentials"]
+    # Convert credentials info to a dictionary for oauth2client
+    credentials_dict = {key: value for key, value in credentials_info.items()}
+    # Authenticate using the credentials
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     gauth = GoogleAuth()
     gauth.credentials = credentials
     drive = GoogleDrive(gauth)
     
-    # Create a secure temporary file
+    # Create and write to a temporary file to avoid holding file content in memory
     with tempfile.NamedTemporaryFile(delete=False, suffix='-' + uploaded_file.name) as temp_file:
-        # Write the content of the uploaded file to the temporary file
         temp_file.write(uploaded_file.read())
-        temp_file_path = temp_file.name  # Store the path to the temporary file
+        temp_file_path = temp_file.name  # Store temporary file path for later upload
     
     try:
-        # Upload the file to Google Drive using the temporary file's path
+        # Create and upload the file to Google Drive
         file_drive = drive.CreateFile({'title': uploaded_file.name})
         file_drive.SetContentFile(temp_file_path)
         file_drive.Upload()
-        return file_drive['id']  # Return the file ID after uploading
+        return file_drive['id']  # Return the uploaded file ID
     finally:
-        # Securely delete the temporary file
+        # Ensure the temporary file is deleted after upload
         os.unlink(temp_file_path)
 
+# Orchestrates the processing of user questions regarding PDF content
 def intent_orchestrator(service_class, user_question):
-    """Orchestrates the process of checking if a question is related to any PDF content."""
+    """
+    Orchestrates the process of checking a user's question for malicious intent and relevance to PDF content.
+    
+    Args:
+        service_class: The class instance providing the services for intent detection and content relevance.
+        user_question: The question posed by the user.
+    
+    Returns:
+        A tuple containing the vectorized question and the original question if relevant, or (None, None) otherwise.
+    """
+    # Detect malicious intent in the user's question
     is_flagged, flag_message = service_class.detect_malicious_intent(user_question)
-    st.write(flag_message)
-
+    st.write(flag_message)  # Display the flag message
+    
     if is_flagged:
+        # If the question is flagged, do not process further
         st.error("Your question was not processed. Please try a different question.")
         return (None, None)
 
+    # Check if the question is related to the PDF content
     related, relatedness_message = service_class.check_relatedness_to_pdf_content(user_question)
-
+    st.write(relatedness_message)  # Display the relatedness message
+    
     if related:
+        # If the question is related, proceed with processing
         vectorized_question = service_class.question_to_embeddings(user_question)
-        st.write(relatedness_message)
         st.success("Your question was processed successfully. Now fetching an answer...")
         return (vectorized_question, user_question)
     else:
-        st.write(relatedness_message)
+        # If not related, do not process further
         st.error("Your question was not processed. Please try a different question.")
         return (None, None)
 
+# Starts the question processing workflow
 def process_user_question(service_class, user_question):
-    """Main function to start the question processing workflow."""
+    """
+    Initiates the processing of a user's question through various services.
+    
+    Args:
+        service_class: The class instance providing services for processing the user's question.
+        user_question: The question posed by the user.
+    
+    Returns:
+        The result of the intent orchestration process.
+    """
+    # Orchestrates the intent processing of the user's question
     result = intent_orchestrator(service_class, user_question)
-    if result:
-        return result
-        
+    return result
 
+# Initiates the retrieval process for information related to the user's question
 def process_retrieval(vectorized_question: str) -> tuple:
-    """Function to start the question processing workflow."""
+    """
+    Retrieves information related to the vectorized question from the vector store.
+    
+    Args:
+        vectorized_question (str): The vectorized form of the user's question.
+    
+    Returns:
+        Retrieved information related to the user's question.
+    """
     service = InformationRetrievalService()
     retrieved_info = service.search_in_vector_store(vectorized_question)
     return retrieved_info
 
-
+# Generates a response based on the user's question and the retrieved information
 def process_response(retrieved_info, question):
-    """Function to return a well formatted question."""
+    """
+    Generates a response to the user's question based on retrieved information.
+    
+    Args:
+        retrieved_info: Information related to the user's question retrieved from the vector store.
+        question: The original question posed by the user.
+    
+    Returns:
+        A generated response to the user's question.
+    """
     response_service_processor = ResponseService()
     final_response = response_service_processor.generate_response(question, retrieved_info)
     return final_response
         
         
 def main():
-    st.title("Talk to your PDF")
-
+    """
+    The main function to run the Streamlit app.
     
+    This function sets up the Streamlit UI components for uploading a PDF, asking questions about its content,
+    and displaying answers based on the content of the uploaded PDF.
+    """
+    # Display the app's title
+    st.title("Talk to your PDF")
+    
+    # Create a file uploader widget to allow users to upload PDF files
     uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
+    
+    # Check if a file has been uploaded
     if uploaded_file is not None:
-        # animation while uploading the PDF and processing the question
+        # Display an animation while processing the uploaded PDF
         with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
+            # Preprocess the uploaded file (e.g., text extraction, embedding generation)
             process_pre_run(uploaded_file)
         
-        file_id = upload_to_google_drive(uploaded_file)
-            
-
-        service_class = IntentService()  # Create an instance of the service class
-
-        # Create a form for question input and submission
+        # Securely upload the processed file to Google Drive
+        _ = upload_to_google_drive(uploaded_file)
+        
+        # Instantiate the service class responsible for intent processing
+        service_class = IntentService()
+        
+        # Create a form for users to input their questions regarding the PDF content
         with st.form(key='question_form'):
             user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
             submit_button = st.form_submit_button(label='Ask')
-
+        
+        # Process the question if the submit button is pressed
         if submit_button:
+            # Check if the question is related to the PDF content and process accordingly
             result = process_user_question(service_class, user_question)
-            if result[0] is not None:  # Check if the first element of the tuple is not None
+            
+            # If the question is successfully processed and deemed related to the content
+            if result[0] is not None:
                 vectorized_question, question = result
+                
+                # Display an animation while retrieving and processing the answer
                 with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
+                    # Retrieve relevant information based on the processed question
                     retrieved_info = process_retrieval(vectorized_question)
+                    
+                    # Generate and display the final response to the user's question
                     final_response = process_response(retrieved_info, question)
                     st.write(final_response)
             
-
-            
-# Run the app
+# Entry point of the Streamlit app
 if __name__ == '__main__':
     main()
