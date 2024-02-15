@@ -261,6 +261,40 @@ This guide will walk you through setting up the "Talk to Your PDF" project from 
 
     Now the app should be deployed to the Streamlit share link, upload PDF files and explore the application's features by asking questions related to the PDF content.
 
+## Repository structure
+
+```
+
+├── assets
+│   ├── how_it_works.png                          <- a diagram picture to show how the app works and how different services interact with each other
+│   ├── talk_to_your_pdf_banner.png               <- banner image used in the README.
+│
+│
+├── notebook_repository
+│   ├── information_retrieval_service.ipynb       <- contains all the logic for information retrieval.
+│   ├── intent_service.ipynb                      <- contains all the logic for question intent check.
+│   ├── main.ipynb                                <- the final file that calls all the other notebooks that holds all the services.
+│   ├── pre_run_service.ipynb                     <- contains all the pre-run processes.
+│   ├── response_service.ipynb                    <- contains all the logic for response process.
+│
+│
+├── .gitignore                                    <- used to ignore certain folder and files that won't be commit to git.
+│
+│
+├── LICENSE                                       <- license file.
+│
+│
+├── README.md                                     <- this readme file.
+│
+│
+├── requirements.txt                              <- list of all the dependencies (used for Streamlit).
+│
+│
+├── streamlit_app.py                              <- file with the all codes and Streamlit component for rendering the interface.
+
+
+```
+
 ## Contributing
 
 Contributions are welcome! For major changes, please open an issue first to discuss what you would like to change. Please ensure to update tests as appropriate.
@@ -269,7 +303,7 @@ Contributions are welcome! For major changes, please open an issue first to disc
 
 MIT License
 
-Copyright (c) 2022 Stern Semasuka
+Copyright (c) 2024 Stern Semasuka
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
