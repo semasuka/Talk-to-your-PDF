@@ -252,7 +252,7 @@ class IntentService:
                 if result:
                     # Determine if the closest embedding is below a certain threshold
                     _, _, distance = result
-                    threshold = 0.5  # Define a threshold for relatedness
+                    threshold = 0.65  # Define a threshold for relatedness
                     if distance < threshold:
                         # Return true and a message if the question is related to the PDF content
                         return True, "Question is related to the PDF content..."
