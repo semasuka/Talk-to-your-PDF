@@ -263,7 +263,7 @@ This guide will walk you through setting up the "Talk to Your PDF" project from 
 
 ## App deployed on Streamlit
 
-![Streamlit GIF](assets/gif_streamlit.gif)
+![Streamlit GIF](https://github.com/semasuka/Talk-to-your-PDF/blob/main/assets/git_streamlit.gif)
 
 Video to gif [tool](https://www.img2go.com/)
 
