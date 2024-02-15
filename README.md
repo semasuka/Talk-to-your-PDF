@@ -2,14 +2,15 @@
 # Talk to your PDF
 
 ![banner](assets/talk_to_your_pdf_banner.png)
-
 ![Python version](https://img.shields.io/badge/Python%20version-3.11%2B-lightgrey)
-![GitHub last commit](https://img.shields.io/github/last-commit/semasuka/Talk-to-your-PDF)  
-![GitHub repo size](https://img.shields.io/github/repo-size/semasuka/Talk-to-your-PDF)  
-![License](https://img.shields.io/badge/License-MIT-green)  
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/semasuka/Talk-to-your-PDF)  
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/semasuka/Talk-to-your-PDF/main/app.py)  
+![GitHub last commit](https://img.shields.io/github/last-commit/semasuka/Talk-to-your-PDF)
+![GitHub repo size](https://img.shields.io/github/repo-size/semasuka/Talk-to-your-PDF)
+![License](https://img.shields.io/badge/License-MIT-green)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wF6NBLDt_SDy1aBeTxNvq7ZIi_bo7nLu)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://talk-to-your-pdf.streamlit.app/)
 [![Open Source Love svg1](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)](https://github.com/ellerbrock/open-source-badges/)
+
+Badge [source](https://shields.io/)
 
 ## Overview
 
