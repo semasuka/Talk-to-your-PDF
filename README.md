@@ -108,7 +108,7 @@ This guide will walk you through setting up the "Talk to Your PDF" project from 
 
 4. **Environment Variables Setup**
    
-   Create a `.env` file in the project directory to securely store your environment variables. Initially, it will look like this
+   Add to your `venv` file in the project directory to securely store your environment variables. Initially, it will look like this
 
    ```bash
     GOOGLE_APPLICATION_CREDENTIALS=path/to/your/google-credentials.json
@@ -261,6 +261,13 @@ This guide will walk you through setting up the "Talk to Your PDF" project from 
 
     Now the app should be deployed to the Streamlit share link, upload PDF files and explore the application's features by asking questions related to the PDF content.
 
+## App deployed on Streamlit
+
+![Streamlit GIF](assets/gif_streamlit.gif)
+
+Video to gif [tool](https://ezgif.com/)
+
+
 ## Repository structure
 
 ```
@@ -268,6 +275,7 @@ This guide will walk you through setting up the "Talk to Your PDF" project from 
 ├── assets
 │   ├── how_it_works.png                          <- a diagram picture to show how the app works and how different services interact with each other
 │   ├── talk_to_your_pdf_banner.png               <- banner image used in the README.
+│   ├── gif_streamlit.gif                         <- gif file used in the README.
 │
 │
 ├── notebook_repository
