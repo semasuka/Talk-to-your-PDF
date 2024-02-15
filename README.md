@@ -30,7 +30,7 @@ Badge [source](https://shields.io/)
 
 ## Tech Stack
 
-- Python 3.8+
+- Python 3.11+
 - Streamlit for the web interface
 - OpenAI for embeddings and intent detection (using the moderation model) and response generation (using GPT-4 turbo)
 - PostgreSQL with Supabase for database management
@@ -70,32 +70,196 @@ Finally, the ResponseService class uses the information retrieved to generate a 
 
 ## Quick Start
 
+This guide will walk you through setting up the "Talk to Your PDF" project from start to finish. Follow these steps to clone the repository, set up your environment, and start interacting with your PDFs in a new way.
+
+0. **Pre-Requisites**
+
+    Before starting, ensure you have the following:
+      - **Python**: Make sure Python is installed on your machine.
+      - **Google Cloud Platform (GCP) Account**: Needed for Google Drive API setup.
+      - **Supabase Account**: Required for database setup.
+
 1. **Clone the repository**
 
-   ```bash
-   git clone https://github.com/yourusername/talk-to-your-pdf.git
-   cd talk-to-your-pdf
-   ```
+    Clone the "Talk to Your PDF" repository and navigate into the project directory
 
-2. **Install dependencies**
+    ```bash
+    git clone https://github.com/semasuka/Talk-to-your-PDF
+    cd Talk-to-your-PDF/
+    ```
+
+2. **Create a Virtual Environment**
+
+    Isolate your project's Python dependencies by creating a virtual environment
+
+    ```bash
+    python -m venv venv
+    source venv/bin/activate # Unix/macOS
+    venv\Scripts\activate # Windows
+    ```
+
+3. **Install dependencies**
+   
+   Install the necessary Python packages for the project
 
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Set up environment variables**
-
-   Create a `.env` file in the project directory and add your OpenAI API key, Supabase URL, and Google credentials.
-
-4. **Run the app**
+4. **Environment Variables Setup**
+   
+   Create a `.env` file in the project directory to securely store your environment variables. Initially, it will look like this
 
    ```bash
-   streamlit run app.py
+    GOOGLE_APPLICATION_CREDENTIALS=path/to/your/google-credentials.json
+    SUPABASE_POSTGRES_URL=your_supabase_postgres_url_here
+    OPENAI_API_KEY=your_openai_api_key_here
+    ```
+
+5. **Google drive API setup**
+    
+   - **Create a Project in Google Cloud Platform (GCP):**
+     - Go to the [Google Cloud Console](https://console.cloud.google.com/).
+     - Click on "Select a project" at the top of the dashboard and then "New Project".
+     - Enter a project name and click "Create".
+
+   - **Enable Google Drive API:**
+     - In the dashboard of your new project, navigate to "APIs & Services" > "Dashboard".
+     - Click on "+ ENABLE APIS AND SERVICES".
+     - Search for "Google Drive API" and enable it for your project.
+
+   - **Create Credentials:**
+     - Go to "APIs & Services" > "Credentials".
+     - Click on "Create credentials" and select "Service account".
+     - Fill out the service account details and grant it a role of "Editor" (or a more restricted role if you know the specific permissions you need).
+     - Click "Create" and then "Done".
+
+   - **Generate a Key for the Service Account:**
+     - Find your new service account in the "Credentials" page and click on it.
+     - Go to the "Keys" tab.
+     - Click on "Add Key" and choose "Create new key".
+     - Select "JSON" as the key type and click "Create".
+     - The JSON key file will be automatically downloaded. This file contains your API key.
+     - Important: Update the GOOGLE_APPLICATION_CREDENTIALS in your .env file with the path to this downloaded JSON file.
+
+   - **Configure the Python Script:**
+     - Open the JSON key file with a text editor and find the `client_email` and `private_key` fields.
+     - In your Python script or environment, set the `client_email` and `private_key` as environment variables, or directly insert them into the `credentials_info` dictionary within the `upload_to_google_drive` function.
+
+   - **Set Environment Variables:**
+     - For security reasons, it's best practice to use environment variables for sensitive information like API keys.
+     - You can set environment variables in your system, or use a `.env` file and load them with `load_dotenv()` in your script.
+     - Set `GOOGLE_APPLICATION_CREDENTIALS` as an environment variable pointing to the path of the downloaded JSON key file.
+
+   - **Install Required Libraries:**
+     - Make sure that all required Python libraries, including `oauth2client`, `PyDrive`, and `google-auth`, are installed in your environment. You can usually install these using `pip install`.
+
+   - **Use the Credentials in the Script:**
+     - In the script, ensure that the `upload_to_google_drive` function is correctly configured to authenticate with Google using the service account credentials.
+
+   - **Test the Setup:**
+     - Run your script in a secure, local development environment first to ensure the Google Drive API is being called correctly and the file is being uploaded.
+     - Make sure to handle the `credentials_dict` properly without exposing your private keys in the source code if you're going to share the script or use it in a public setting.
+
+6. **Supabase database setup**
+
+   - **Sign Up or Log In to Supabase**
+      - Navigate to [Supabase](https://supabase.io) and sign in or create a new account.
+      - Once logged in, create a new project by clicking on the 'New Project' button.
+
+   - **Project Configuration**
+      - Fill in the necessary details for your project, such as the name and password.
+      - Wait for the project to be fully deployed. This might take a couple of minutes.
+
+   - **Database Setup**
+      - Once the project is ready, go to the SQL editor in the Supabase dashboard of your project.
+      - You can run SQL commands here to set up your database schemas and extensions.
+
+   - **Install pgvector Extension**
+      - Execute the following SQL command to add the `pgvector` extension to your database:
+        ```sql
+        CREATE EXTENSION IF NOT EXISTS vector;
+        ```
+      - This command sets up the database to handle vector data types which are required for the embeddings.
+
+   - **Create Table with Vector Column**
+      - Create a table that will store your embeddings with a vector column by running:
+        ```sql
+        CREATE TABLE pdf_holder (
+            id SERIAL PRIMARY KEY,
+            text TEXT,
+            embedding VECTOR(3072)
+        );
+        ```
+      - This table will be used to store the text from the PDFs and their corresponding embeddings.
+
+   - **Retrieve Supabase Credentials**
+      - After setting up your table, go to the 'Settings' > 'Database' section of your project's dashboard.
+      - Here you can find the `SUPABASE_POSTGRES_URL` which is required for connecting to the database from your application.
+
+   - **Set Up Environment Variables**
+      - In your application environment, set the `SUPABASE_POSTGRES_URL` as an environment variable.
+      - This is essential for your application to connect and interact with your Supabase database securely.
+
+   - **Integrate with the Application**
+      - Use the `create_engine` function from the `sqlalchemy` library to connect to your Supabase database using the URL from the previous step.
+      - Utilize the database session to execute your operations, such as storing and retrieving vector data.
+
+   - **Test the Database Connection**
+      - Before proceeding, ensure that your application can connect to the Supabase database and perform operations.
+      - Try inserting a dummy record or retrieving data from the `pdf_holder` table as a test.
+
+   - **Deploy Your Application**
+       - After confirming the database connection, you can proceed to deploy your application.
+       - Monitor the application logs to ensure there are no connection issues with the Supabase database.
+7. **OpenAI API Setup**
+
+    - Obtain your OpenAI API key from the OpenAI API platform.
+    - Fill in the `OPENAI_API_KEY` in your `.env` file with your key.
+
+8. **Run the app locally**
+
+    Go to the directory that contains the app and run
+
+   ```bash
+   streamlit run streamlit_app.py
    ```
 
-## Deployment
+9. **Testing and Validation**
 
-This app is deployed on Streamlit Sharing. You can access it [here](https://share.streamlit.io/yourusername/talk-to-your-pdf/main/app.py). Follow the instructions in the `Deployment on streamlit` section of this README for details on deploying your own version.
+    To verify your setup:
+
+    - Perform a test upload to Google Drive through the app.
+    - Ensure the app can process queries about the uploaded PDFs correctly.
+
+10. **Set up deploy and set up the Streamlit secrets**
+
+    If the app is running fine locally you can deploy it on Streamlit share and add your OpenAI API key, Supabase URL, and Google drive credentials (JSON file from your service account) to the TOML placeholder. Your TOML key-value pairs should look like this
+
+    ```toml
+        SUPABASE_POSTGRES_URL="postgresql://<USERNAME>:<PASSWORD>@<HOST>:<PORT>/<DATABASE>"
+        OPENAI_API_KEY="<OPENAI_API_KEY_PLACEHOLDER>"
+        [google_credentials]
+        type = "service_account"
+        project_id = "<PROJECT_ID_PLACEHOLDER>"
+        private_key_id = "<PRIVATE_KEY_ID_PLACEHOLDER>"
+        private_key = """
+        -----BEGIN PRIVATE KEY-----
+        <PRIVATE_KEY_CONTENTS_PLACEHOLDER>
+        -----END PRIVATE KEY-----
+        """
+        client_email = "<CLIENT_EMAIL_PLACEHOLDER>"
+        client_id = "<CLIENT_ID_PLACEHOLDER>"
+        auth_uri = "https://accounts.google.com/o/oauth2/auth"
+        token_uri = "https://oauth2.googleapis.com/token"
+        auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+        client_x509_cert_url = "<CLIENT_X509_CERT_URL_PLACEHOLDER>"
+        universe_domain = "googleapis.com"
+    ```
+
+11. **Deploying and using the Application**
+
+    Now the app should be deployed to the Streamlit share link, upload PDF files and explore the application's features by asking questions related to the PDF content.
 
 ## Contributing
 
@@ -103,4 +267,30 @@ Contributions are welcome! For major changes, please open an issue first to disc
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE.md file for details.
+MIT License
+
+Copyright (c) 2022 Stern Semasuka
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Learn more about [MIT](https://choosealicense.com/licenses/mit/) license
+
+
+
+
