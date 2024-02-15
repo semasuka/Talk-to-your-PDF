@@ -6,7 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# credts
 credentials.json
+
+# container files
+.devcontainer/
+
 
 # Distribution / packaging
 .Python
