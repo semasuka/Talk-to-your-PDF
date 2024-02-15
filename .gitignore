@@ -171,3 +171,6 @@ cython_debug/
 # Misc
 pdf_folder/
 pdf_db.sql
+.DS_Store
+
+
