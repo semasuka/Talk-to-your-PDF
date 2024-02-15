@@ -14,7 +14,11 @@ Badge [source](https://shields.io/)
 
 ## Overview
 
-"Talk to your PDF" is an interactive app that allows users to upload PDF documents and ask questions about their content. Utilizing advanced NLP techniques like retrieval augmented generation (RAG), the app extracts text from the PDFs, generates embeddings of the text and question, and provides relevant responses to user queries without the need for manual document navigation. This app is built from scratch, no framework (like LangChain) used.
+"Talk to your PDF" is an interactive app that allows users to upload PDF documents and ask questions about their content. Utilizing advanced NLP techniques like retrieval augmented generation (RAG), the app extracts text from the PDFs, generates embeddings of the PDF text and question, and provides relevant responses to user queries without the need for manual document navigation. This app is built from scratch, no framework (like LangChain) used.
+
+## Authors
+
+- [@semasuka](https://www.github.com/semasuka)
 
 ## Features
 
@@ -22,15 +26,18 @@ Badge [source](https://shields.io/)
 - User query processing with intent detection to ensure relevant and safe interactions.
 - Database storage of PDF embeddings for quick access and response generation.
 - Integration with Google Drive for secure and convenient file management.
+- Clean and intuitive interface
 
 ## Tech Stack
 
 - Python 3.8+
 - Streamlit for the web interface
-- OpenAI for embeddings and intent detection
+- OpenAI for embeddings and intent detection (using the moderation model) and response generation (using GPT-4 turbo)
 - PostgreSQL with Supabase for database management
-- Google Drive API for file storage
+- pgvector PostgreSQL extension to handle vectors embedding
+- Google Drive API for the PDF storage
 - Requests and Tempfile for handling HTTP requests and temporary file management
+- SQLAlchemy for connecting to the PostgreSQL database using Python to run SQL queries
 
 ## Quick Start
 
