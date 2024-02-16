@@ -11,6 +11,7 @@ from streamlit_lottie import st_lottie_spinner
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
+from streamlit.components.v1 import iframe
 
 # Load environment variables
 load_dotenv()
@@ -359,40 +360,61 @@ class ResponseService:
 # Securely uploads a file to Google Drive and ensures the temporary file is deleted after upload
 def upload_to_google_drive(uploaded_file):
     """
-    Uploads a file to Google Drive using service account credentials and deletes the temporary file.
+    Uploads a file to Google Drive using service account credentials, makes it publicly viewable,
+    and returns a shareable link for the uploaded file.
     
     Args:
         uploaded_file: The file uploaded by the user through the Streamlit interface.
     
     Returns:
-        The Google Drive file ID of the uploaded file.
+        str: The shareable link of the uploaded file.
     """
-    # Define the scope for Google Drive API access
-    scope = ['https://www.googleapis.com/auth/drive.file']
-    # Load Google Drive API credentials from Streamlit secrets (TOML format)
+    # Define the scope for Google Drive API access to allow file uploading and sharing.
+    scope = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive']
+    
+    # Load Google Drive API credentials from Streamlit secrets (TOML format).
+    # These credentials are stored securely and used to authenticate with Google Drive.
     credentials_info = st.secrets["google_credentials"]
-    # Convert credentials info to a dictionary for oauth2client
+    
+    # Convert credentials info to a dictionary suitable for the oauth2client library.
+    # This step formats the credentials in a way that GoogleAuth can use for authentication.
     credentials_dict = {key: value for key, value in credentials_info.items()}
-    # Authenticate using the credentials
+    
+    # Authenticate using the service account credentials to access Google Drive.
     credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     gauth = GoogleAuth()
-    gauth.credentials = credentials
-    drive = GoogleDrive(gauth)
+    gauth.credentials = credentials  # Set the authenticated credentials
+    drive = GoogleDrive(gauth)  # Create a GoogleDrive instance with authenticated GoogleAuth instance
     
-    # Create and write to a temporary file to avoid holding file content in memory
+    # Use a temporary file to store the uploaded file's content.
+    # This approach avoids loading the entire file content into memory, which is efficient for large files.
     with tempfile.NamedTemporaryFile(delete=False, suffix='-' + uploaded_file.name) as temp_file:
-        temp_file.write(uploaded_file.read())
-        temp_file_path = temp_file.name  # Store temporary file path for later upload
+        temp_file.write(uploaded_file.read())  # Write the uploaded file content to the temporary file
+        temp_file_path = temp_file.name  # Store the path of the temporary file for later use in uploading
     
     try:
-        # Create and upload the file to Google Drive
+        # Create a new file on Google Drive using the uploaded file's name.
         file_drive = drive.CreateFile({'title': uploaded_file.name})
+        # Set the content of the Google Drive file to that of the temporary file.
         file_drive.SetContentFile(temp_file_path)
-        file_drive.Upload()
-        return file_drive['id']  # Return the uploaded file ID
+        file_drive.Upload()  # Upload the file to Google Drive
+        
+        # Change the uploaded file's sharing settings to make it viewable by anyone with the link.
+        file_drive.InsertPermission({
+            'type': 'anyone',
+            'value': 'anyone',
+            'role': 'reader'
+        })
+        
+        # Generate a shareable link to the uploaded file.
+        # This link is used to embed the PDF in the Streamlit app for viewing.
+        shareable_link = file_drive['alternateLink']
+        return shareable_link  # Return the shareable link of the uploaded file
     finally:
-        # Ensure the temporary file is deleted after upload
+        # Ensure the temporary file is deleted after the upload process is complete.
+        # This cleanup step prevents accumulation of temporary files on the server.
         os.unlink(temp_file_path)
+
 
 # Orchestrates the processing of user questions regarding PDF content
 def intent_orchestrator(service_class, user_question):
@@ -479,52 +501,57 @@ def process_response(retrieved_info, question):
         
 def main():
     """
-    The main function to run the Streamlit app.
-    
-    This function sets up the Streamlit UI components for uploading a PDF, asking questions about its content,
-    and displaying answers based on the content of the uploaded PDF.
+    The main function to run the Streamlit app, enhanced to include PDF preview functionality.
+
+    This function sets up the Streamlit UI components for uploading a PDF, previewing it,
+    asking questions about its content, and displaying answers based on the content of the uploaded PDF.
     """
-    # Display the app's title
+    # Display the app's title at the top of the app.
     st.title("Talk to your PDF")
-    
-    # Create a file uploader widget to allow users to upload PDF files
+
+    # Create a file uploader widget allowing users to upload PDF files.
     uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
-    
-    # Check if a file has been uploaded
+
+    # Execute the following block if a PDF file has been uploaded.
     if uploaded_file is not None:
-        # Display an animation while processing the uploaded PDF
+        # Display an animation indicating the app is processing the uploaded PDF.
         with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
-            # Preprocess the uploaded file (e.g., text extraction, embedding generation)
+            # Preprocess the uploaded file (e.g., text extraction, embedding generation).
             process_pre_run(uploaded_file)
-        
-        # Securely upload the processed file to Google Drive
-        _ = upload_to_google_drive(uploaded_file)
-        
-        # Instantiate the service class responsible for intent processing
+
+        # Securely upload the processed file to Google Drive and obtain the shareable link.
+        shareable_link = upload_to_google_drive(uploaded_file)
+
+        # Display the PDF in an embedded iframe using the shareable link for previewing.
+        st.markdown("## PDF Preview")
+        st.markdown(f'<iframe src="{shareable_link}" width="700" height="1000"></iframe>', unsafe_allow_html=True)
+
+        # Instantiate the service class responsible for intent processing and question relevance.
         service_class = IntentService()
-        
-        # Create a form for users to input their questions regarding the PDF content
+
+        # Create a form for users to input their questions regarding the PDF content.
         with st.form(key='question_form'):
             user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
             submit_button = st.form_submit_button(label='Ask')
-        
-        # Process the question if the submit button is pressed
+
+        # Execute the following block if the submit button within the form is pressed.
         if submit_button:
-            # Check if the question is related to the PDF content and process accordingly
+            # Check if the question is related to the PDF content and process accordingly.
             result = process_user_question(service_class, user_question)
-            
-            # If the question is successfully processed and deemed related to the content
+
+            # Execute the following block if the question is successfully processed and deemed related to the content.
             if result[0] is not None:
                 vectorized_question, question = result
-                
-                # Display an animation while retrieving and processing the answer
+
+                # Display an animation while retrieving and processing the answer.
                 with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
-                    # Retrieve relevant information based on the processed question
+                    # Retrieve relevant information based on the processed question.
                     retrieved_info = process_retrieval(vectorized_question)
-                    
-                    # Generate and display the final response to the user's question
+
+                    # Generate and display the final response to the user's question.
                     final_response = process_response(retrieved_info, question)
                     st.write(final_response)
+
             
 # Entry point of the Streamlit app
 if __name__ == '__main__':

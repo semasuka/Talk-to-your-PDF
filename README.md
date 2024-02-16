@@ -50,11 +50,11 @@ The user begins by uploading a PDF document through the application's interface.
 
 #### Step 2: Pre-run Service
 
-The PreRunProcessor class takes charge by extracting text from the PDF. It then generates embeddings for the extracted text using the OpenAI API. These embeddings are numerical representations that encapsulate the meaning of the text segments, making them suitable for comparison and retrieval tasks.
+The `PreRunProcessor` class takes charge by extracting text from the PDF. It then generates embeddings for the extracted text using the OpenAI API. These embeddings are numerical representations that encapsulate the meaning of the text segments, making them suitable for comparison and retrieval tasks.
 
 #### Step 3: Intent Service
 
-When the user submits a query about the PDF's content, the IntentService class performs two critical functions:
+When the user submits a query about the PDF's content, the `IntentService` class performs two critical functions:
 
 - Malicious Intent Detection: Utilizes OpenAI's moderation model to ensure the query does not contain inappropriate content.
 - Relatedness Check: Converts the user's query into embeddings and checks if the query is relevant to the content of the PDF. This is done by comparing the query embeddings against the stored text embeddings from the PDF.
@@ -62,11 +62,11 @@ When the user submits a query about the PDF's content, the IntentService class p
 
 #### Step 4: Information Retrieval Service
 
-Upon establishing the relevance of the query to the PDF content, the InformationRetrievalService class employs a cosine similarity search to find the most pertinent text segment that matches the query embeddings. Cosine similarity is a metric used to measure how similar the embeddings are, thus identifying the segment of the PDF that best addresses the user's query.
+Upon establishing the relevance of the query to the PDF content, the `InformationRetrievalService` class employs a cosine similarity search to find the most pertinent text segment that matches the query embeddings. Cosine similarity is a metric used to measure how similar the embeddings are, thus identifying the segment of the PDF that best addresses the user's query.
 
 #### Step 5: Response Service
 
-Finally, the ResponseService class uses the information retrieved to generate a response to the user's query. It leverages OpenAI's ChatCompletion API to formulate an answer that is not only relevant but also articulated in a clear and informative manner.
+Finally, the `ResponseService` class uses the information retrieved to generate a response to the user's query. It leverages OpenAI's ChatCompletion API to formulate an answer that is not only relevant but also articulated in a clear and informative manner.
 
 ## Quick Start
 
