@@ -405,20 +405,12 @@ def upload_to_google_drive(uploaded_file):
             'role': 'reader'
         })
         
-        # # Generate a shareable link to the uploaded file.
-        # # This link is used to embed the PDF in the Streamlit app for viewing.
-        # # use 'webContentLink' or 'embedLink' to get the correct URL for iframe embedding
-        # shareable_link = file_drive['webContentLink']
-        # # Modify the link to use the '/view' endpoint for embedding
-        # shareable_link = shareable_link.replace('/edit', '/view')
-        
         # Format the shareable link for preview.
         shareable_link = f"https://drive.google.com/file/d/{file_drive['id']}/preview"
         
         # Print the shareable link for testing purposes.
         st.write("Shareable link:", shareable_link)
         
-        return shareable_link  # Return the shareable link of the uploaded file
     finally:
         # Ensure the temporary file is deleted after the upload process is complete.
         # This cleanup step prevents accumulation of temporary files on the server.
@@ -524,12 +516,8 @@ def main():
         with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
             process_pre_run(uploaded_file)  # Preprocess the uploaded file
         
-        # Securely upload the processed file to Google Drive and obtain the shareable link
-        shareable_link = upload_to_google_drive(uploaded_file)
-        
-        # Embed the PDF viewer using the shareable link
-        st.markdown("## PDF Preview")
-        st.markdown(f'<iframe src="{shareable_link}" width="700" height="1000"></iframe>', unsafe_allow_html=True)
+        # Securely upload the processed file to Google Drive
+        upload_to_google_drive(uploaded_file)
         
         # Instantiate the service class for intent processing
         service_class = IntentService()
