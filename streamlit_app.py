@@ -529,7 +529,7 @@ def main():
         
         # Embed the PDF viewer using the shareable link
         st.markdown("## PDF Preview")
-        st.components.v1.iframe(shareable_link, width=700, height=1000, scrolling=True)
+        st.markdown(f'<iframe src="{shareable_link}" width="700" height="1000"></iframe>', unsafe_allow_html=True)
         
         # Instantiate the service class for intent processing
         service_class = IntentService()
