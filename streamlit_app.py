@@ -11,7 +11,6 @@ from streamlit_lottie import st_lottie_spinner
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
-from streamlit.components.v1 import iframe
 
 # Load environment variables
 load_dotenv()
@@ -501,55 +500,46 @@ def process_response(retrieved_info, question):
         
 def main():
     """
-    The main function to run the Streamlit app, enhanced to include PDF preview functionality.
-
-    This function sets up the Streamlit UI components for uploading a PDF, previewing it,
-    asking questions about its content, and displaying answers based on the content of the uploaded PDF.
+    The main function to run the Streamlit app, including a PDF viewer.
     """
-    # Display the app's title at the top of the app.
+    # Display the app's title
     st.title("Talk to your PDF")
-
-    # Create a file uploader widget allowing users to upload PDF files.
+    
+    # Create a file uploader widget for PDF files
     uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
-
-    # Execute the following block if a PDF file has been uploaded.
+    
+    # Check if a file has been uploaded
     if uploaded_file is not None:
-        # Display an animation indicating the app is processing the uploaded PDF.
+        # Display an animation while processing the uploaded PDF
         with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
-            # Preprocess the uploaded file (e.g., text extraction, embedding generation).
-            process_pre_run(uploaded_file)
-
-        # Securely upload the processed file to Google Drive and obtain the shareable link.
+            process_pre_run(uploaded_file)  # Preprocess the uploaded file
+        
+        # Securely upload the processed file to Google Drive and obtain the shareable link
         shareable_link = upload_to_google_drive(uploaded_file)
-
-        # Display the PDF in an embedded iframe using the shareable link for previewing.
+        
+        # Embed the PDF viewer using the shareable link
         st.markdown("## PDF Preview")
-        st.markdown(f'<iframe src="{shareable_link}" width="700" height="1000"></iframe>', unsafe_allow_html=True)
-
-        # Instantiate the service class responsible for intent processing and question relevance.
+        st.components.v1.iframe(shareable_link, width=700, height=1000, scrolling=True)
+        
+        # Instantiate the service class for intent processing
         service_class = IntentService()
-
-        # Create a form for users to input their questions regarding the PDF content.
+        
+        # Create a form for user's questions about the PDF content
         with st.form(key='question_form'):
             user_question = st.text_input("Ask a question about the PDF content:", key="question_input")
             submit_button = st.form_submit_button(label='Ask')
-
-        # Execute the following block if the submit button within the form is pressed.
+        
+        # Process the question if the submit button is pressed
         if submit_button:
-            # Check if the question is related to the PDF content and process accordingly.
             result = process_user_question(service_class, user_question)
-
-            # Execute the following block if the question is successfully processed and deemed related to the content.
-            if result[0] is not None:
+            
+            if result[0] is not None:  # If the question is related to the PDF content
                 vectorized_question, question = result
-
-                # Display an animation while retrieving and processing the answer.
+                
                 with st_lottie_spinner(loading_animation, quality='high', height='100px', width='100px'):
-                    # Retrieve relevant information based on the processed question.
-                    retrieved_info = process_retrieval(vectorized_question)
-
-                    # Generate and display the final response to the user's question.
-                    final_response = process_response(retrieved_info, question)
+                    retrieved_info = process_retrieval(vectorized_question)  # Retrieve relevant information
+                    
+                    final_response = process_response(retrieved_info, question)  # Generate and display response
                     st.write(final_response)
 
             
