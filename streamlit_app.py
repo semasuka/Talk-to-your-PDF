@@ -405,12 +405,18 @@ def upload_to_google_drive(uploaded_file):
             'role': 'reader'
         })
         
-        # Generate a shareable link to the uploaded file.
-        # This link is used to embed the PDF in the Streamlit app for viewing.
-        # use 'webContentLink' or 'embedLink' to get the correct URL for iframe embedding
-        shareable_link = file_drive['webContentLink']
-        # Modify the link to use the '/view' endpoint for embedding
-        shareable_link = shareable_link.replace('/edit', '/view')
+        # # Generate a shareable link to the uploaded file.
+        # # This link is used to embed the PDF in the Streamlit app for viewing.
+        # # use 'webContentLink' or 'embedLink' to get the correct URL for iframe embedding
+        # shareable_link = file_drive['webContentLink']
+        # # Modify the link to use the '/view' endpoint for embedding
+        # shareable_link = shareable_link.replace('/edit', '/view')
+        
+        # Format the shareable link for preview.
+        shareable_link = f"https://drive.google.com/file/d/{file_drive['id']}/preview"
+        
+        # Print the shareable link for testing purposes.
+        st.write("Shareable link:", shareable_link)
         
         return shareable_link  # Return the shareable link of the uploaded file
     finally:
