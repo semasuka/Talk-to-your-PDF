@@ -75,6 +75,7 @@ This guide will walk you through setting up the "Talk to Your PDF" project from 
 0. **Pre-Requisites**
 
     Before starting, ensure you have the following:
+      - **Openai API account**: Needed for the OpenAI API key.
       - **Python**: Make sure Python is installed on your machine.
       - **Google Cloud Platform (GCP) Account**: Needed for Google Drive API setup.
       - **Supabase Account**: Required for database setup.
