@@ -20,6 +20,26 @@ Badge [source](https://shields.io/)
 
 - [@semasuka](https://www.github.com/semasuka)
 
+## Table of Contents
+
+- [Talk to your PDF](#talk-to-your-pdf)
+  - [Overview](#overview)
+  - [Authors](#authors)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Tech Stack](#tech-stack)
+  - [How It Works](#how-it-works)
+      - [Step 1: File Upload](#step-1-file-upload)
+      - [Step 2: Pre-run Service](#step-2-pre-run-service)
+      - [Step 3: Intent Service](#step-3-intent-service)
+      - [Step 4: Information Retrieval Service](#step-4-information-retrieval-service)
+      - [Step 5: Response Service](#step-5-response-service)
+  - [Quick Start](#quick-start)
+  - [App deployed on Streamlit](#app-deployed-on-streamlit)
+  - [Repository structure](#repository-structure)
+  - [Contributing](#contributing)
+  - [License](#license)
+
 ## Features
 
 - PDF text extraction and embedding generation for efficient information retrieval.
