@@ -21,14 +21,14 @@ Badge [source](https://shields.io/)
 - [@semasuka](https://www.github.com/semasuka)
 
 ## Table of Contents
-
 - [Talk to your PDF](#talk-to-your-pdf)
   - [Overview](#overview)
   - [Authors](#authors)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Tech Stack](#tech-stack)
-  - [How It Works](#how-it-works)
+  - [How RAG Works](#how-rag-works)
+  - [How the app Works](#how-the-app-works)
       - [Step 1: File Upload](#step-1-file-upload)
       - [Step 2: Pre-run Service](#step-2-pre-run-service)
       - [Step 3: Intent Service](#step-3-intent-service)
@@ -59,9 +59,46 @@ Badge [source](https://shields.io/)
 - Requests and Tempfile for handling HTTP requests and temporary file management
 - SQLAlchemy for connecting to the PostgreSQL database using Python to run SQL queries
 
-## How It Works
+## How RAG Works
 
-![How it works](assets/how_it_works.png)
+![How RAG works](assets/rag_explained.jpeg)
+[Image credit](https://towardsdatascience.com/why-your-rag-is-not-reliable-in-a-production-environment-9e6a73b3eddb)
+
+**Indexing**
+
+- Loader: This component is responsible for loading the knowledge base into the system. The knowledge base contains a vast collection of information that the RAG system will draw from to generate responses.
+
+- Documents: After the knowledge base is loaded, it's organized into documents. These documents are then processed and made ready for the next steps. They could be anything from wiki articles to textbooks or any other structured collection of text. In our case we are using text extracted from the PDF.
+
+- Splitter: The splitter takes these documents and breaks them down into smaller, more manageable pieces known as document snippets. These snippets are easier to work with when matching the information to a query.
+
+- Embedding Machine: The document snippets are then fed into an embedding machine, which converts the text into embeddings. These embeddings are high-dimensional vectors (3072 for this app) that represent the semantic meaning of the snippets.
+
+- Embeddings: The result is a set of embeddings, each corresponding to a document snippet from the knowledge base.
+
+- Vector Database: The embeddings are stored in a vector database(PostgreSQL with pgvector extension). This database allows for efficient similarity searches; for example, when the system needs to find the snippet most closely related to a given query, it can perform a "closeness" query.
+
+**Retrieval**
+
+- Question: This represents the user's query/question regarding the PDF, such as "How do I do X?"
+
+- Embedding Machine: The same embedding machine used during indexing processes the question to convert it into an embedding.
+
+- Embeddings: The question embedding is then used to search the vector database for the most relevant document snippets.
+
+- Vector Database: The system queries the vector database with the embedding of the question to find the closest matching document snippets.
+
+- Relevant Snippets: The most relevant snippets are retrieved from the database. These are the snippets that have the closest embeddings to the question's embedding.
+
+**Augmented Answer Generation**
+
+- LLM (Large Language Model): The retrieved snippets are fed into a large language model along with the original question.
+
+- Answer: By considering both the user's question and the information contained within the relevant snippets, the language model generates an informed, well structured and contextually relevant answer, like "To do X...".
+
+## How the app Works
+
+![How the app works](assets/how_it_works.png)
 
 
 #### Step 1: File Upload
@@ -294,9 +331,10 @@ Video to gif [tool](https://www.img2go.com/)
 ```
 
 ├── assets
-│   ├── how_it_works.png                          <- a diagram picture to show how the app works and how different services interact with each other
-│   ├── talk_to_your_pdf_banner.png               <- banner image used in the README.
 │   ├── gif_streamlit.gif                         <- gif file used in the README.
+│   ├── how_it_works.png                          <- a diagram picture to show how the app works and how different services interact with each other.
+│   ├── rag_explained.jpeg                        <- a picture with RAG explanation.
+│   ├── talk_to_your_pdf_banner.png               <- banner image used in the README.
 │
 │
 ├── notebook_repository
