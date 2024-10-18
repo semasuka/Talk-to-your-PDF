@@ -10,8 +10,10 @@ dependencies:
     - numpy
     - openai
     - requests
+    - pydrive
+    - python-dotenv
+    - oauth2client
     - sqlalchemy
     - pdfminer.six
     - streamlit-lottie
-    - pydrive
-    - oauth2client
+    - psycopg2-binary
