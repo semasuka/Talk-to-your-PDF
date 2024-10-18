@@ -173,4 +173,5 @@ pdf_folder/
 pdf_db.sql
 .DS_Store
 
-
+# file that holds the secrets
+.streamlit/
