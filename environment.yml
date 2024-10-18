@@ -1,20 +1,17 @@
 name: .talk_to_pdf
 channels:
+  - conda-forge
   - defaults
 dependencies:
-  - bzip2=1.0.8=h80987f9_6
-  - ca-certificates=2024.9.24=hca03da5_0
-  - libffi=3.4.4=hca03da5_1
-  - ncurses=6.4=h313beb8_0
-  - openssl=3.0.15=h80987f9_0
-  - pip=24.2=py311hca03da5_0
-  - python=3.11.10=hb885b13_0
-  - readline=8.2=h1a28f6b_0
-  - setuptools=75.1.0=py311hca03da5_0
-  - sqlite=3.45.3=h80987f9_0
-  - tk=8.6.14=h6ba3021_0
-  - tzdata=2024b=h04d1e81_0
-  - wheel=0.44.0=py311hca03da5_0
-  - xz=5.4.6=h80987f9_1
-  - zlib=1.2.13=h18a0788_1
-prefix: /opt/anaconda3/envs/.talk_to_pdf
+  - python=3.11
+  - pip
+  - pip:
+    - streamlit
+    - numpy
+    - openai
+    - requests
+    - sqlalchemy
+    - pdfminer.six
+    - streamlit-lottie
+    - pydrive
+    - oauth2client
