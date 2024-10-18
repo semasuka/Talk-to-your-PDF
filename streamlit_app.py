@@ -3,7 +3,6 @@ import streamlit as st
 import numpy as np
 import openai, os, requests, tempfile
 
-# from dotenv import load_dotenv  # Comment out or remove this line
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import ProgrammingError
@@ -12,8 +11,6 @@ from streamlit_lottie import st_lottie_spinner
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
-
-# load_dotenv()  # Comment out or remove this line
 
 
 # Function to load Lottie animations using URL
